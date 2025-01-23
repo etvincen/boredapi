@@ -1,0 +1,372 @@
+# Web Content Migration System
+
+## Project Goal
+Create an automated system to migrate an existing website's content into a headless CMS (ContentFul) through the following pipeline:
+
+1. **Content Extraction**: 
+   - Systematically capture all content from a JavaScript-rendered website
+   - Preserve hierarchical structure and relationships between pages
+   - Handle multiple content types (articles, FAQs, products, media)
+
+2. **Content Storage**:
+   - Store extracted content in a search-optimized database (Elasticsearch)
+   - Maintain metadata and operational data in PostgreSQL
+   - Preserve content relationships and structure
+
+3. **API Development**:
+   - Create a dedicated API that serves as a bridge between stored content and ContentFul
+   - Provide endpoints specifically designed for:
+     * Content retrieval for ContentFul migration
+     * Search functionality for content verification
+     * Migration status tracking
+     * Content structure manipulation (General CRUD operations)
+
+4. **ContentFul Population**:
+   - Use the API to systematically populate ContentFul with the extracted content
+   - Ensure proper content modeling in the headless CMS
+   - Enable content management and future modifications through ContentFul's interface
+
+The end result will be a fully populated headless CMS that mirrors the original website's content, enabling better content management and future modifications through ContentFul's interface.
+
+## Input/Output Specifications
+
+### Input Requirements
+- Primary input: Root website URL
+- Domain Scope:
+  * Crawl within specified domain and its subdomains
+  * Exclude external domains and partner sites
+  * Respect domain boundaries during link traversal
+  * Example: For domain "example.com", crawl "blog.example.com" but skip "partner-site.com"
+
+### Output Interface
+- RESTful API endpoints providing:
+  * Content retrieval and search capabilities
+  * Migration control and status monitoring
+  * ContentFul synchronization management
+  * Hierarchical content structure access
+- All endpoints follow standard REST conventions with JSON responses and proper error handling
+
+## System Architecture Overview
+
+```mermaid
+graph LR
+A[Source Website] --> B[Playwright Scraper]
+B --> C[Content Processor]
+C --> D[Elasticsearch]
+C --> E[PostgreSQL]
+D --> F[FastAPI]
+E --> F
+F --> G[ContentFul]
+```
+
+## Detailed Requirements
+
+### Scraping Requirements
+- Target: Static website with JavaScript-rendered content (~200 articles, 1000-3000 words each)
+- Content types: Articles, FAQs, Product Listing Pages (3), forms, images, short videos
+- Structure: Maintain hierarchical structure and breadcrumb trails
+- Special focus: Capture conversion form and persistent CTA banner
+- Scale: ~200 articles, must be robust but no massive scaling needed
+
+### Technical Implementation
+- **Primary Tool**: Playwright (Python)
+  * JavaScript rendering support
+  * Crawler functionality
+  * Minimal robots.txt compliance
+  * No rate limiting requirements
+
+## 2. Storage Layer
+### Content Database (Elasticsearch/OpenSearch)
+- Purpose: Primary content storage and search
+- Features:
+  * Full-text search capabilities
+  * Hierarchical data storage
+  * Content relationships preservation
+
+### Metadata Database (PostgreSQL)
+- Purpose: System operations and tracking
+- Storage for:
+  * Scraping logs and history
+  * User authentication data
+  * System metadata
+  * Content migration states
+
+### Data Schema (Early standardized template)
+```json
+{
+"content_item": {
+    "id": "unique_identifier",
+    "type": "article|faq|product|form",
+    "url": "source_url",
+    "title": "content_title",
+    "content": "main_content",
+    "hierarchy": {
+        "level": "integer",
+        "parent_id": "parent_reference",
+        "breadcrumb": ["path", "to", "content"]
+    },
+    "media": [{
+        "type": "image|video",
+        "url": "media_url",
+        "metadata": {}
+    }],
+    "metadata": {
+        "word_count": "integer",
+        "last_updated": "timestamp",
+        "status": "scraping_state"
+    }
+}
+}
+```
+
+## 3. API Layer
+### FastAPI Implementation
+- Authentication:
+  * Bearer token authentication
+  * Support for 2-3 admin users
+- Endpoints:
+  * Content retrieval
+  * Search functionality
+  * Migration status
+  * System operations
+
+## Development Environment
+
+### Docker-based Infrastructure
+1. **Core Services**:
+   - FastAPI application container
+   - Elasticsearch (or OpenSearch) container
+   - PostgreSQL container
+   - Grafana container for monitoring
+
+2. **Container Configuration**:
+   - Isolated network for inter-service communication
+   - Volume mounts for data persistence
+   - Environment variable management
+   - Hot-reload for development
+
+3. **Resource Allocation**:
+   - Minimal Elasticsearch heap size (2GB sufficient for POC)
+   - Standard PostgreSQL configuration
+   - Contained resource usage for development
+
+### Environment Management
+1. **Configuration Files**:
+   - `.env` files for service configuration
+   - Docker compose for service orchestration
+   - Separate dev/prod configurations
+
+2. **Dependencies**:
+   - Python 3.12+ with Conda and Poetry environment
+   - Docker and Docker Compose
+   - Required system packages for Playwright
+   - Development tools (linters, formatters)
+
+3. **Local Setup Requirements**:
+   - Minimum 8GB RAM
+   - 20GB available storage
+   - Unix-based system preferred (Linux/MacOS)
+   - Docker Desktop for Windows if necessary
+
+### Development Workflow
+1. **Service Initialization**:
+   - One-command service startup
+   - Automatic dependency resolution
+   - Development server with hot-reload
+   - Integrated monitoring dashboard
+
+2. **Data Flow Testing**:
+   - Local content scraping simulation
+   - Database population verification
+   - API endpoint testing
+   - ContentFul integration testing
+
+3. **Monitoring Setup**:
+   - Grafana dashboard configuration
+   - Local log aggregation
+   - Performance metrics collection
+   - Error tracking integration
+
+This environment setup ensures consistent development experience across team members while maintaining minimal resource overhead for the proof of concept phase.
+
+## Migration Monitoring & Validation System
+
+## 1. Content Validation Metrics
+
+### Quantitative Checks
+- Total number of pages scraped vs. expected (~200 articles)
+- Content type distribution:
+  * Article count
+  * FAQ count
+  * Product pages (exactly 3)
+  * Forms captured
+  * Media assets (images, videos) count
+- Word count validation (1000-3000 words per article)
+- Breadcrumb completeness percentage
+- Hyperlink integrity (internal/external links)
+
+### Structural Validation
+- Hierarchy depth matches source
+- Parent-child relationships preserved
+- Navigation paths completeness
+- Form structure integrity (especially conversion forms)
+- CTA banner presence across content
+
+## 2. Migration Status Dashboard
+
+### Real-time Monitoring
+```json
+{
+    "migration_status": {
+        "overall_progress": {
+            "total_pages": 200,
+            "processed": "counter",
+            "successful": "counter",
+            "failed": "counter",
+            "pending": "counter"
+        },
+        "content_type_status": {
+            "articles": {"processed": N, "failed": N},
+            "faqs": {"processed": N, "failed": N},
+            "products": {"processed": N, "failed": N},
+            "forms": {"processed": N, "failed": N}
+        },
+        "media_assets": {
+            "images": {"processed": N, "failed": N},
+            "videos": {"processed": N, "failed": N}
+        }
+    }
+}
+```
+
+### Error Tracking
+- Error categorization:
+  * Scraping failures
+  * Processing errors
+  * Storage failures
+  * ContentFul upload issues
+- Error severity levels
+- Retry status
+- Error resolution paths
+
+## 3. Logging System
+
+### Structured Logging
+```json
+{
+    "log_entry": {
+        "timestamp": "ISO8601",
+        "level": "INFO|WARNING|ERROR|CRITICAL",
+        "stage": "SCRAPE|PROCESS|STORE|MIGRATE",
+        "content_id": "unique_identifier",
+        "content_type": "article|faq|product|form",
+        "action": "action_performed",
+        "status": "success|failure",
+        "error_details": {
+            "type": "error_category",
+            "message": "error_description",
+            "stack_trace": "trace_if_applicable"
+        },
+        "performance_metrics": {
+            "duration_ms": "integer",
+            "memory_usage": "value",
+            "api_calls": "counter"
+        }
+    }
+}
+```
+
+## 4. Test Cases
+
+### Content Integrity Tests
+1. **Structure Tests**
+   - Breadcrumb accuracy
+   - URL structure preservation
+   - Hierarchy validation
+   - Internal link resolution
+
+2. **Content Tests**
+   - Text content completeness
+   - HTML structure preservation
+   - Media asset accessibility
+   - Form functionality
+   - CTA presence and positioning
+
+3. **Data Consistency Tests**
+   - Source vs. stored content comparison
+   - Stored vs. ContentFul content comparison
+   - Metadata accuracy
+   - Relationship integrity
+
+## 5. Monitoring Dashboard Implementation
+
+### Backend (FastAPI Endpoints)
+```python
+@app.get("/migration/status")
+async def get_migration_status():
+    """Overall migration status and progress"""
+    pass
+
+@app.get("/migration/errors")
+async def get_error_report(
+    severity: Optional[str] = None,
+    content_type: Optional[str] = None
+):
+    """Filtered error reports"""
+    pass
+
+@app.get("/migration/content-validation")
+async def get_content_validation():
+    """Content validation metrics"""
+    pass
+```
+
+### Visualization (Example Grafana Dashboard)
+- Migration Progress Panel
+  * Progress bars per content type
+  * Success/failure rates
+  * Time-series of processing rate
+
+- Error Monitoring Panel
+  * Error distribution by type
+  * Error severity breakdown
+  * Retry success rates
+
+- Content Validation Panel
+  * Content completeness metrics
+  * Structure validation results
+  * Media asset status
+
+## 6. Automated Health Checks
+
+### Periodic Validation
+1. **Content Completeness**
+   - Compare source sitemap with migrated content
+   - Verify media asset accessibility
+   - Check content relationships
+
+2. **Data Consistency**
+   - Cross-reference between storage layers
+   - Verify ContentFul synchronization
+   - Check for orphaned content
+
+3. **System Health**
+   - API endpoint availability
+   - Database connection status
+   - ContentFul API status
+   - Processing queue health
+
+## 7. Recovery Procedures
+
+### Error Recovery
+1. Automated retry logic for failed items
+2. Manual intervention triggers
+3. Rollback capabilities
+4. Partial migration resume functionality
+
+### Data Reconciliation
+1. Missing content detection
+2. Duplicate content resolution
+3. Broken relationship repair
+4. Media asset recovery
+

@@ -1,0 +1,43 @@
+web_migration_system/
+├── .env.example
+├── .gitignore
+├── README.md
+├── docker-compose.yml
+├── pyproject.toml
+├── src/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── routes/
+│   │   │   ├── __init__.py
+│   │   │   ├── content.py
+│   │   │   ├── migration.py
+│   │   │   └── health.py
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   └── schemas.py
+│   │   └── dependencies.py
+│   ├── scraper/
+│   │   ├── __init__.py
+│   │   ├── crawler.py
+│   │   ├── content_processor.py
+│   │   └── validators.py
+│   ├── storage/
+│   │   ├── __init__.py
+│   │   ├── elasticsearch.py
+│   │   └── postgresql.py
+│   ├── contentful/
+│   │   ├── __init__.py
+│   │   ├── client.py
+│   │   └── mapper.py
+│   └── config.py
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_api/
+│   ├── test_scraper/
+│   ├── test_storage/
+│   └── test_contentful/
+└── docker/
+    ├── Dockerfile
+    └── docker-compose.yml 

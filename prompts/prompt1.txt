@@ -1,0 +1,65 @@
+Create a web scraping and content migration system with the following specifications:
+
+1. SCRAPING REQUIREMENTS
+- Target: Static website with JavaScript-rendered content (~200 articles, 1000-3000 words each)
+- Content types: Articles, FAQs, Product Listing Pages (3), forms, images, short videos
+- Structure: Maintain hierarchical structure and breadcrumb trails
+- Special focus: Capture conversion form and persistent CTA banner
+- Scale: ~200 articles, must be robust but no massive scaling needed
+
+2. TECHNICAL STACK
+- Scraping: Playwright (Python)
+  - Handle JavaScript-rendered content
+  - Support for modern web features
+  - Spider/crawler functionality
+  - Minimal respect for robots.txt
+  - No rate limiting concerns
+  
+- Database: 
+  - Primary: Elasticsearch (later OpenSearch)
+    - Optimized for content search
+    - Support hierarchical data structure
+    - Enable both syntactic and semantic search
+  - Secondary: PostgreSQL
+    - Store metadata, logs, user data
+    - Track scraping history
+
+- API: FastAPI
+  - Simple REST endpoints
+  - Basic bearer authentication (2-3 users)
+  - Endpoints for content retrieval and search
+  - Integration with Elasticsearch/PostgreSQL
+
+3. CONTENT STRUCTURE
+- Document schema should include:
+  - Unique identifiers
+  - Content type (article/FAQ/product)
+  - Full text content
+  - Media references
+  - Hierarchical metadata
+  - Breadcrumb information
+  - URLs and relationships
+  - Timestamps
+
+4. CONTENTFUL INTEGRATION
+- One-time migration strategy
+- Create matching content models
+- Handle media asset upload
+- Maintain content relationships
+- Support potential re-migration
+
+5. IMPLEMENTATION PRIORITIES
+1. Set up scraping infrastructure with Playwright
+2. Implement content extraction and structure
+3. Setup Elasticsearch and PostgreSQL schemas
+4. Create FastAPI endpoints
+5. Develop ContentFul upload functionality
+
+6. QUALITY REQUIREMENTS
+- Error handling for failed scrapes
+- Data validation before ContentFul upload
+- Media asset processing pipeline
+- Basic logging and monitoring
+- Simple retry mechanisms
+
+Please provide implementation starting with the scraping infrastructure.
