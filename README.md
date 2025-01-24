@@ -19,10 +19,10 @@ This system provides:
 
 2. Configure environment:
     cp .env.example .env
-    # Edit .env with your values:
-    # - TARGET_DOMAIN: Website to scrape
-    # - CONTENTFUL credentials
-    # - Database settings
+    Edit .env with your values:
+     - TARGET_DOMAIN: Website to scrape
+     - CONTENTFUL credentials
+     - Database settings
 
 3. Start the system:
     ./scripts/manage.sh start
@@ -149,7 +149,3 @@ The system monitors:
 3. Make your changes
 4. Run tests: ./scripts/manage.sh test
 5. Submit a pull request
-
-## License
-
-[Your License Here] 
