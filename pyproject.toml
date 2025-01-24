@@ -1,21 +1,26 @@
 [tool.poetry]
-name = "web-migration-system"
+name = "web-scraping-system"
 version = "0.1.0"
 description = "Web Content Migration System to Contentful"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["etienne.vincent@wivoo.fr"]
+packages = [
+    { include = "src" }
+]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "~3.12"
 fastapi = "^0.109.0"
 uvicorn = "^0.27.0"
 playwright = "^1.41.0"
 elasticsearch = "^8.11.0"
 asyncpg = "^0.29.0"
-contentful-management = "^8.0.0"
+contentful-management = "^2.13.0"
 pydantic = "^2.5.0"
 pydantic-settings = "^2.1.0"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 structlog = "^24.1.0"
+prometheus-client = "^0.19.0"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
@@ -30,10 +35,5 @@ ruff = "^0.1.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.black]
-line-length = 88
-target-version = ["py312"]
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3 
+[tool.poetry.scripts]
+crawl = "src.cli.crawler_cli:main"

@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: web-scraper-api
+    environment:
+      - WAIT_FOR_DB=true
+      - WAIT_FOR_ES=true
+    env_file:
+      - ../.env
+    command: api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - elasticsearch
+    restart: unless-stopped
+
+  crawler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: web-scraper-crawler
+    environment:
+      - WAIT_FOR_DB=true
+      - WAIT_FOR_ES=true
+    env_file:
+      - ../.env
+    command: crawler
+    volumes:
+      - ../crawl_results:/app/crawl_results
+    depends_on:
+      - db
+      - elasticsearch
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - ../.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  elasticsearch_data: 

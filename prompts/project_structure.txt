@@ -2,8 +2,15 @@ web_migration_system/
 ├── .env.example
 ├── .gitignore
 ├── README.md
-├── docker-compose.yml
+├── docker/
+│   ├── Dockerfile
+│   ├── Dockerfile.test
+│   ├── docker-compose.prod.yml
+│   └── entrypoint.sh
 ├── pyproject.toml
+├── scripts/
+│   ├── dev_crawler.sh
+│   └── manage.sh
 ├── src/
 │   ├── __init__.py
 │   ├── api/
@@ -17,6 +24,9 @@ web_migration_system/
 │   │   │   ├── __init__.py
 │   │   │   └── schemas.py
 │   │   └── dependencies.py
+│   ├── cli/
+│   │   ├── __init__.py
+│   │   └── crawler_cli.py
 │   ├── scraper/
 │   │   ├── __init__.py
 │   │   ├── crawler.py
@@ -30,6 +40,9 @@ web_migration_system/
 │   │   ├── __init__.py
 │   │   ├── client.py
 │   │   └── mapper.py
+│   ├── monitoring/
+│   │   ├── __init__.py
+│   │   └── metrics.py
 │   └── config.py
 ├── tests/
 │   ├── __init__.py
@@ -38,6 +51,5 @@ web_migration_system/
 │   ├── test_scraper/
 │   ├── test_storage/
 │   └── test_contentful/
-└── docker/
-    ├── Dockerfile
-    └── docker-compose.yml 
+├── logs/                    # Runtime logs
+└── crawl_results/           # Scraped content 
