@@ -118,8 +118,14 @@ class WebCrawler:
     async def browser_context(self):
         """Context manager for browser initialization and cleanup"""
         try:
+            logger.info("Starting playwright...")
             self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch()
+            logger.info("Launching browser...")
+            self.browser = await self.playwright.chromium.launch(
+                headless=True,  # Add this
+                args=['--disable-gpu']  # And this for better performance
+            )
+            logger.info("Browser launched successfully")
             yield
         finally:
             if self.browser:
@@ -149,7 +155,7 @@ class WebCrawler:
         try:
             metadata = {
                 "last_updated": await page.evaluate("() => document.lastModified"),
-                "word_count": await page.evaluate("""
+                "word_count": await page.evaluate(r"""
                     () => document.body.innerText.split(/\s+/).length
                 """)
             }
@@ -209,8 +215,11 @@ class WebCrawler:
     
     async def _worker(self, worker_id: int):
         """Worker to process URLs from the queue"""
-        async with self.browser.new_context() as context:
+        context = await self.browser.new_context()
+        page = None
+        try:
             page = await context.new_page()
+            logger.info(f"Worker {worker_id} started", worker_id=worker_id)
             
             while not self.state.should_stop:
                 try:
@@ -276,22 +285,46 @@ class WebCrawler:
                 except Exception as e:
                     logger.error(
                         "Error processing URL", 
-                        url=url, 
+                        url=url if 'url' in locals() else 'unknown', 
                         error=str(e),
                         worker_id=worker_id
                     )
                     await self.state.update_stats(failed=1)
-                finally:
-                    self.state.queue.task_done()
+                    # Only call task_done if we actually got a task
+                    if 'url' in locals():
+                        self.state.queue.task_done()
+                
+        except Exception as e:
+            logger.error(
+                "Worker error", 
+                worker_id=worker_id, 
+                error=str(e)
+            )
+        finally:
+            # Graceful cleanup
+            try:
+                if page:
+                    await page.close()
+                if context:
+                    await context.close()
+            except Exception as e:
+                logger.debug(
+                    "Cleanup error in worker", 
+                    worker_id=worker_id, 
+                    error=str(e)
+                )
     
     async def crawl(self, start_url: str, max_duration: int = 3600):
         """Main crawling method with timeout"""
+        logger.info("Initializing browser...")
         async with self.browser_context():
+            logger.info("Browser initialized successfully")
+            
             # Initialize with start URL
             await self.state.queue.put(start_url)
             await self.state.update_stats(queued=1)
             
-            # Create workers
+            logger.info("Starting workers...", worker_count=settings.MAX_CONCURRENT_SCRAPES)
             workers = [
                 self._worker(i) 
                 for i in range(settings.MAX_CONCURRENT_SCRAPES)
@@ -300,7 +333,7 @@ class WebCrawler:
             try:
                 # Run workers with timeout
                 await asyncio.wait_for(
-                    asyncio.gather(*workers),
+                    asyncio.gather(*workers, return_exceptions=True),  # Add return_exceptions=True
                     timeout=max_duration
                 )
             except asyncio.TimeoutError:
@@ -309,14 +342,15 @@ class WebCrawler:
                     duration=max_duration,
                     processed=self.state.stats.total_processed
                 )
-                self.state.stop_crawling()
             except Exception as e:
                 logger.error("Crawl error", error=str(e))
-                self.state.stop_crawling()
             finally:
-                # Wait for queue to be empty
-                if not self.state.queue.empty():
-                    await self.state.queue.join()
+                self.state.stop_crawling()
+                # Wait for queue to be empty with timeout
+                try:
+                    await asyncio.wait_for(self.state.queue.join(), timeout=5)
+                except asyncio.TimeoutError:
+                    logger.warning("Queue cleanup timed out")
             
             return {
                 "results": self.state.results,

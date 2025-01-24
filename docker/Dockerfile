@@ -30,7 +30,7 @@ COPY src/ ./src/
 
 # Configure Poetry
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+    && poetry install --no-interaction --no-ansi
 
 # Install Playwright browser
 RUN playwright install chromium --with-deps

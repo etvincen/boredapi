@@ -11,6 +11,44 @@ This system provides:
 - Progress tracking in PostgreSQL
 - Monitoring with Prometheus metrics
 
+## Environment Setup
+
+The system supports two environments:
+
+### Development Environment (default)
+- Python code runs locally through Poetry
+- Databases (Elasticsearch, PostgreSQL) run in containers
+- Hot-reloading enabled for faster development
+- Access databases directly on localhost ports
+
+```bash
+# Start development databases
+./scripts/manage.sh start
+
+# Run crawler locally
+./scripts/manage.sh crawler
+
+# Ingest data to databases
+./scripts/manage.sh ingest
+```
+
+### Production Environment
+- All components run in containers
+- Proper service orchestration
+- Automatic health checks
+- Internal container networking
+
+```bash
+# Start production environment
+ENV=prod ./scripts/manage.sh start
+
+# Run crawler in container
+ENV=prod ./scripts/manage.sh crawler
+
+# Ingest data in container
+ENV=prod ./scripts/manage.sh ingest
+```
+
 ## Quick Start
 
 1. Clone the repository:
@@ -24,8 +62,9 @@ This system provides:
     # - CONTENTFUL credentials
     # - Database settings
 
-3. Start the system:
-    ./scripts/manage.sh start
+3. Choose your environment:
+   - For development (default): ./scripts/manage.sh start
+   - For production: ENV=prod ./scripts/manage.sh start
 
 ## Key Features
 
@@ -52,37 +91,63 @@ This system provides:
   - Service health monitoring
   - Prometheus metrics integration
 
-## Development
+## Development Workflow
 
-Start development environment:
-    ./scripts/dev_crawler.sh
+1. Start development environment:
+```bash
+./scripts/manage.sh start  # Starts Elasticsearch and PostgreSQL containers
+```
 
-Run tests:
-    ./scripts/manage.sh test
+2. Run crawler locally:
+```bash
+./scripts/manage.sh crawler  # Uses local Python with Poetry
+```
 
-View logs:
-    ./scripts/manage.sh logs
+3. Ingest data:
+```bash
+./scripts/manage.sh ingest  # Processes latest results into databases
+```
 
-## Production
+4. View logs:
+```bash
+./scripts/manage.sh logs
+```
 
-The production environment provides:
-- Containerized services with Docker
-- Automatic service orchestration
-- Health checks and automatic restarts
-- Volume persistence for data
-- Resource management
-- Environment isolation
+## Production Workflow
 
-### Management Commands
+1. Start production environment:
+```bash
+ENV=prod ./scripts/manage.sh start  # Starts all containers
+```
 
-Start production services:
-    ./scripts/manage.sh start
+2. Run crawler in container:
+```bash
+ENV=prod ./scripts/manage.sh crawler
+```
 
-Stop services:
-    ./scripts/manage.sh stop
+3. Ingest data:
+```bash
+ENV=prod ./scripts/manage.sh ingest
+```
 
-View logs:
-    ./scripts/manage.sh logs
+4. Monitor:
+```bash
+ENV=prod ./scripts/manage.sh logs
+```
+
+## Environment Differences
+
+Development:
+- Local Python execution (faster development)
+- Direct database access (localhost:5432, localhost:9200)
+- Development volume mounts
+- Hot-reloading enabled
+
+Production:
+- Fully containerized
+- Internal container networking
+- Production volume mounts
+- Health checks enforced
 
 ## API Endpoints
 
@@ -107,13 +172,15 @@ CONTENTFUL_ACCESS_TOKEN=your-token
 CONTENTFUL_ENVIRONMENT=master
 
 # Storage
-POSTGRES_SERVER=localhost
-ELASTICSEARCH_HOST=localhost
+POSTGRES_SERVER=localhost  # (dev) or db (prod)
+ELASTICSEARCH_HOST=localhost  # (dev) or elasticsearch (prod)
 
 ## Project Structure
 
 web_migration_system/
 ├── docker/          # Docker configuration
+│   ├── docker-compose.dev.yml   # Development setup
+│   └── docker-compose.prod.yml  # Production setup
 ├── scripts/         # Management scripts
 ├── src/
 │   ├── api/        # FastAPI application

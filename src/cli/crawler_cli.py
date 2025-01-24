@@ -68,7 +68,7 @@ async def run_crawler_test():
         
         # Alert if storage usage is high
         if results["storage"]["usage_percentage"] > 80:
-            print("\n⚠️  WARNING: Storage usage is high!")
+            print("\nWARNING: Storage usage is high!")
             
     except Exception as e:
         logger.error("Crawler test failed", error=str(e))
