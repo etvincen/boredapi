@@ -45,7 +45,7 @@ htmlcov/
 .mypy_cache/
 
 # Docker
-.docker/
+docker/data/*
 docker-compose.override.yml
 
 # Elasticsearch
