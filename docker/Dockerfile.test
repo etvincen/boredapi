@@ -1,9 +1,46 @@
-FROM python:3.12-slim
+# Use Python 3.12 slim image as base
+FROM python:3.12-slim as python-base
+
+# Python configuration
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_VERSION=1.7.1 \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_IN_PROJECT=false \
+    POETRY_NO_INTERACTION=1 \
+    PYSETUP_PATH="/opt/pysetup" \
+    VENV_PATH="/opt/pysetup/.venv"
+
+# Add Poetry to PATH
+ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+
+# Builder stage
+FROM python-base as builder-base
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry via curl
+RUN curl -sSL https://install.python-poetry.org | python3 -
+
+# Copy project dependency files
+WORKDIR $PYSETUP_PATH
+COPY poetry.lock pyproject.toml ./
+
+# Install all dependencies including dev dependencies
+RUN poetry install --no-root
+
+# Final stage
+FROM python-base as test
+
+# Install runtime system dependencies
+RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
+    curl \
     && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
     && apt-get update \
@@ -11,28 +48,28 @@ RUN apt-get update && apt-get install -y \
     google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy dependencies from builder
+COPY --from=builder-base $PYSETUP_PATH $PYSETUP_PATH
+
+# Set working directory
 WORKDIR /app
 
-# Install Poetry
-RUN pip install poetry
-
 # Copy project files
-COPY pyproject.toml poetry.lock ./
 COPY src/ ./src/
 COPY tests/ ./tests/
-
-# Install all dependencies including dev dependencies
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
 
 # Install Playwright browser
 RUN playwright install chromium --with-deps
 
-# Create directories
-RUN mkdir -p logs crawl_results
+# Create directories with proper permissions
+RUN mkdir -p logs crawl_results \
+    && chown -R nobody:nogroup logs crawl_results
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
+# Switch to non-root user
+USER nobody
+
+# Set environment variables for testing
+ENV PYTHONPATH=/app
 
 # Default command runs tests
 CMD ["pytest", "-v", "--cov=src"] 

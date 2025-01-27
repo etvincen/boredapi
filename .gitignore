@@ -36,7 +36,15 @@ ENV/
 
 # Project specific
 logs/
-crawl_results/
+data/  # Development data directory
+!data/.gitkeep
+
+# Crawler results
+crawl_results/*.json
+!crawl_results/
+!crawl_results/.gitkeep
+
+# Testing
 .coverage
 coverage.xml
 htmlcov/
@@ -45,17 +53,7 @@ htmlcov/
 .mypy_cache/
 
 # Docker
-docker/data/*
 docker-compose.override.yml
-
-# Elasticsearch
-elasticsearch_data/
-
-# PostgreSQL
-postgres_data/
-
-# Grafana
-grafana_data/
 
 # Temporary files
 *.log

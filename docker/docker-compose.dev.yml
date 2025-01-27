@@ -19,9 +19,10 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=true
     volumes:
       - ${DEV_DATA_PATH:-./data}/elasticsearch:/usr/share/elasticsearch/data
-    user: "1000:1000"
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "9200:9200"
     healthcheck:
@@ -29,7 +30,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
 
 volumes:
   postgres_data_dev:
-  elasticsearch_data_dev: 
+  elasticsearch_data_dev:
+
+networks:
+  scraper-dev-net:
+    driver: bridge 

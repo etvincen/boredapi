@@ -21,22 +21,33 @@ check_env_file() {
 init_dev_data() {
     if [ "$ENV" = "dev" ]; then
         echo "Initializing development data directories..."
-        mkdir -p "$DEV_DATA_PATH/postgres"
-        mkdir -p "$DEV_DATA_PATH/elasticsearch"
+        
+        # Clean up old data location if it exists
+        if [ -d "$PROJECT_ROOT/docker/data" ]; then
+            echo "Found old data directory in docker/data, moving to new location..."
+            mv "$PROJECT_ROOT/docker/data/postgres"/* "$PROJECT_ROOT/data/postgres/" 2>/dev/null || true
+            mv "$PROJECT_ROOT/docker/data/elasticsearch"/* "$PROJECT_ROOT/data/elasticsearch/" 2>/dev/null || true
+            rm -rf "$PROJECT_ROOT/docker/data"
+            echo "Old data moved to new location"
+        fi
+        
+        # Create new data directories
+        mkdir -p "$PROJECT_ROOT/data/postgres"
+        mkdir -p "$PROJECT_ROOT/data/elasticsearch"
         
         # Get current user and group ID
         local uid=$(id -u)
         local gid=$(id -g)
         
         # Set permissions for PostgreSQL
-        sudo chown -R $uid:$gid "$DEV_DATA_PATH/postgres"
-        chmod 700 "$DEV_DATA_PATH/postgres"
+        sudo chown -R $uid:$gid "$PROJECT_ROOT/data/postgres"
+        chmod 700 "$PROJECT_ROOT/data/postgres"
         
         # Set permissions for Elasticsearch
-        sudo chown -R $uid:$gid "$DEV_DATA_PATH/elasticsearch"
-        chmod 755 "$DEV_DATA_PATH/elasticsearch"
+        sudo chown -R $uid:$gid "$PROJECT_ROOT/data/elasticsearch"
+        chmod 755 "$PROJECT_ROOT/data/elasticsearch"
         
-        echo "Development data will be stored in: $DEV_DATA_PATH"
+        echo "Development data will be stored in: $PROJECT_ROOT/data"
         echo "Permissions set for user $uid:$gid"
     fi
 }
