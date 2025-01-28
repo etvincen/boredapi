@@ -1,172 +1,92 @@
-import asyncio
-import structlog
-from pathlib import Path
 import json
+from pathlib import Path
+import logging
+from elasticsearch import Elasticsearch
+from typing import Optional, Dict, Any
+import os
 from datetime import datetime
-from typing import Dict, Any, List
-from src.storage.elasticsearch import ElasticsearchClient
-from src.storage.postgresql import PostgresClient
-from contextlib import asynccontextmanager
+from ..elasticsearch.indexer import ContentIndexer
 
-logger = structlog.get_logger()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class DataIngestion:
-    def __init__(self):
-        self.es_client = None
-        self.pg_client = None
-    
-    async def __aenter__(self):
-        """Initialize clients when entering context"""
-        try:
-            self.es_client = ElasticsearchClient()
-            self.pg_client = PostgresClient()
-            await self.init_storage()
-            return self
-        except Exception as e:
-            logger.error("Failed to initialize storage clients", error=str(e))
-            if self.es_client:
-                await self.es_client.close()
-            if self.pg_client:
-                await self.pg_client.close()
-            raise
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Cleanup clients when exiting context"""
-        if self.es_client:
-            await self.es_client.close()
-        if self.pg_client:
-            await self.pg_client.close()
-    
-    async def init_storage(self):
-        """Initialize storage connections and schemas"""
-        # Initialize Elasticsearch indices
-        await self.es_client.init_indices()
+def find_latest_crawl_results() -> Optional[Path]:
+    """Find the most recent crawl results file"""
+    crawl_dir = Path('crawl_results')
+    if not crawl_dir.exists():
+        logger.error("Crawl results directory not found")
+        return None
         
-        # Initialize PostgreSQL connection and tables
-        await self.pg_client.init_pool()
-        await self.pg_client.init_tables()
-    
-    async def get_latest_crawl_results(self) -> Dict[str, Any]:
-        """Get the latest crawl results file"""
-        crawl_dir = Path("crawl_results")
-        if not crawl_dir.exists():
-            raise FileNotFoundError("No crawl results directory found")
-            
-        result_files = list(crawl_dir.glob("crawl_results_*.json"))
-        if not result_files:
-            raise FileNotFoundError("No crawl result files found")
-            
-        # Get the latest file by name (they contain timestamps)
-        latest_file = max(result_files)
+    result_files = list(crawl_dir.glob('crawl_results_*.json'))
+    if not result_files:
+        logger.error("No crawl result files found")
+        return None
         
-        logger.info("Found latest crawl results", file=str(latest_file))
-        
-        with open(latest_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    
-    async def store_content(self, content: Dict[str, Any]) -> str:
-        """Store a single content item and its metadata"""
-        try:
-            # Store in Elasticsearch
-            content_id = await self.es_client.store_content(content)
-            
-            # Extract metadata
-            metadata = {
-                'title': content.get('title'),
-                'content_type': content.get('type'),
-                'word_count': content.get('metadata', {}).get('word_count', 0),
-                'media': content.get('media', [])
-            }
-            
-            # Extract hierarchy information
-            hierarchy = {
-                'parent_id': content.get('hierarchy', {}).get('parent_id'),
-                'level': content.get('hierarchy', {}).get('level', 0),
-                'path': content.get('hierarchy', {}).get('path', [])
-            }
-            
-            # Store metadata and hierarchy
-            await self.pg_client.store_content_metadata(
-                content_id=content_id,
-                url=content['url'],
-                metadata=metadata,
-                hierarchy=hierarchy
-            )
-            
-            return content_id
-            
-        except Exception as e:
-            logger.error(
-                "Error storing content",
-                url=content.get("url"),
-                error=str(e)
-            )
-            raise
-    
-    async def process_results(self, results: Dict[str, Any]):
-        """Process and store all results"""
-        stored_count = 0
-        failed_count = 0
-        
-        for content in results["results"]:
-            try:
-                content_id = await self.store_content(content)
-                stored_count += 1
-                logger.info(
-                    "Stored content",
-                    content_id=content_id,
-                    url=content["url"]
-                )
-            except Exception as e:
-                failed_count += 1
-                logger.error(
-                    "Failed to store content",
-                    url=content.get("url"),
-                    error=str(e)
-                )
-        
-        return {
-            "stored": stored_count,
-            "failed": failed_count,
-            "total": len(results["results"])
-        }
+    # Sort by modification time
+    latest_file = max(result_files, key=lambda p: p.stat().st_mtime)
+    logger.info(f"Found latest crawl results: {latest_file}")
+    return latest_file
 
-async def main():
-    # Configure logging
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.dict_tracebacks,
-            structlog.processors.JSONRenderer()
-        ]
-    )
-    
+def load_crawl_results(file_path: Path) -> Dict[str, Any]:
+    """Load crawl results from JSON file"""
     try:
-        logger.info("Starting data ingestion")
+        with file_path.open('r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        logger.error(f"Error loading crawl results: {str(e)}")
+        raise
+
+def get_elasticsearch_client() -> Elasticsearch:
+    """Get Elasticsearch client from environment variables"""
+    es_host = os.getenv('ELASTICSEARCH_HOST', 'localhost')
+    es_port = os.getenv('ELASTICSEARCH_PORT', '9200')
+    es_user = os.getenv('ELASTICSEARCH_USER')
+    es_pass = os.getenv('ELASTICSEARCH_PASSWORD')
+    
+    if es_user and es_pass:
+        return Elasticsearch(
+            [f"http://{es_host}:{es_port}"],
+            basic_auth=(es_user, es_pass)
+        )
+    else:
+        return Elasticsearch([f"http://{es_host}:{es_port}"])
+
+def main():
+    try:
+        # Find latest crawl results
+        latest_crawl = find_latest_crawl_results()
+        if not latest_crawl:
+            logger.error("No crawl results found")
+            return
+            
+        logger.info(f"Found latest crawl results: {latest_crawl}")
         
-        async with DataIngestion() as ingestion:
-            # Get latest results
-            results = await ingestion.get_latest_crawl_results()
-            
-            # Process results
-            stats = await ingestion.process_results(results)
-            
-            logger.info(
-                "Data ingestion completed",
-                stored=stats["stored"],
-                failed=stats["failed"],
-                total=stats["total"]
-            )
-            
-            # Print summary
-            print("\nIngestion Summary:")
-            print(f"Total Documents: {stats['total']}")
-            print(f"Successfully Stored: {stats['stored']}")
-            print(f"Failed: {stats['failed']}")
+        # Load crawl results
+        logger.info("Loading crawl results...")
+        crawl_data = load_crawl_results(latest_crawl)
+        
+        # Index pages
+        logger.info(f"Indexing {len(crawl_data['results'])} pages...")
+        indexer = ContentIndexer(get_elasticsearch_client())
+        result = indexer.index_pages(crawl_data['results'])
+        
+        logger.info("\n=== Indexing Complete ===")
+        logger.info(f"Total pages: {result['total_pages']}")
+        logger.info(f"Successfully indexed: {result['indexed']}")
+        logger.info(f"Failed: {result['failed']}")
+        
+        # Get index stats
+        index_stats = indexer.es.indices.stats(index=indexer.index_name)
+        doc_count = indexer.es.count(index=indexer.index_name)
+        
+        logger.info("\n=== Index Statistics ===")
+        logger.info(f"Documents in index: {doc_count['count']}")
+        logger.info(f"Index size: {index_stats['indices'][indexer.index_name]['total']['store']['size_in_bytes'] / 1024 / 1024:.2f} MB")
         
     except Exception as e:
-        logger.error("Data ingestion failed", error=str(e))
+        logger.error(f"Error during ingestion: {e}")
         raise
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    main() 

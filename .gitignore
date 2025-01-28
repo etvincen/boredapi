@@ -34,6 +34,17 @@ ENV/
 *.swo
 .DS_Store
 
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Analysis results
+analysis_results/
+kibana/
+
+# TMP
+logstash/
+
 # Project specific
 logs/
 data/  # Development data directory
