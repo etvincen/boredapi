@@ -1,37 +1,29 @@
 from pydantic_settings import BaseSettings
-from typing import Optional, List
+from typing import Optional
 
 class Settings(BaseSettings):
     # API Settings
-    API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "Web Migration System"
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+    API_WORKERS: int = 4
     
-    # Security
-    SECRET_KEY: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
-    
-    # Database
-    POSTGRES_SERVER: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    
-    # Elasticsearch
-    ELASTICSEARCH_HOST: str
-    ELASTICSEARCH_PORT: int = 9200
-    ELASTICSEARCH_USERNAME: Optional[str] = None
-    ELASTICSEARCH_PASSWORD: Optional[str] = None
-    
-    # Contentful
-    CONTENTFUL_SPACE_ID: str
-    CONTENTFUL_ACCESS_TOKEN: str
-    CONTENTFUL_ENVIRONMENT: str = "master"
-    
-    # Scraping
+    # Target Website
+    TARGET_DOMAIN: str = "https://www.roc-eclerc.fr"
     MAX_CONCURRENT_SCRAPES: int = 5
     SCRAPING_DELAY: float = 1.0  # seconds
-    TARGET_DOMAIN: str
-    URL_BLACKLIST_PATTERNS: List[str] = ["nos-agences", "avis-de-deces"]  # URLs containing these patterns will be skipped
+    
+    # Elasticsearch Settings
+    ELASTICSEARCH_HOST: str = "localhost"
+    ELASTICSEARCH_PORT: int = 9200
+    ELASTICSEARCH_USER: Optional[str] = None
+    ELASTICSEARCH_PASSWORD: Optional[str] = None
+    ELASTICSEARCH_USE_SSL: bool = False
+    
+    # Kibana Settings
+    KIBANA_HOST: str = "localhost"
+    KIBANA_PORT: int = 5601
+    KIBANA_USER: str = "elastic"
+    KIBANA_PASSWORD: str = "elastic"
     
     class Config:
         env_file = ".env"

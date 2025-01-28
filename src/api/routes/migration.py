@@ -2,12 +2,11 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Optional, Dict, Any
 from src.scraper.crawler import WebCrawler
 from src.storage.elasticsearch import ElasticsearchClient
-from src.storage.postgresql import PostgresClient
 from src.config import settings
+from elasticsearch import Elasticsearch
 
 router = APIRouter()
 es_client = ElasticsearchClient()
-pg_client = PostgresClient()
 
 @router.post("/start")
 async def start_migration(
@@ -26,14 +25,27 @@ async def start_migration(
     
     return {"message": "Migration started", "start_url": start_url}
 
-@router.get("/status")
+@router.get("/migration/status")
 async def get_migration_status():
-    """Get migration status statistics"""
+    """Get current migration status"""
     try:
-        stats = await pg_client.get_migration_stats()
-        return stats
+        es = Elasticsearch([f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"])
+        stats = es.indices.stats(index="roc_eclerc_content")
+        count = es.count(index="roc_eclerc_content")
+        
+        return {
+            "status": "in_progress",
+            "documents": {
+                "total": count["count"],
+                "indexed": stats["indices"]["roc_eclerc_content"]["total"]["indexing"]["index_total"],
+                "failed": stats["indices"]["roc_eclerc_content"]["total"]["indexing"]["index_failed"]
+            }
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting migration status: {str(e)}"
+        )
 
 @router.post("/retry/{content_id}")
 async def retry_migration(content_id: str):
@@ -42,7 +54,7 @@ async def retry_migration(content_id: str):
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
     
-    await pg_client.update_migration_status(
+    await es_client.update_migration_status(
         content_id=content_id,
         url=content["url"],
         status="pending"

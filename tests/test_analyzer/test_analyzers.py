@@ -1,4 +1,4 @@
-from utils.web_analysis import load_crawl_results, CrawlResultsAnalyzer
+from src.utils.web_analysis import load_crawl_results, CrawlResultsAnalyzer
 from pathlib import Path
 import json
 import logging

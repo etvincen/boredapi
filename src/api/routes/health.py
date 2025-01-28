@@ -1,29 +1,21 @@
-from fastapi import APIRouter, HTTPException
-from src.storage.elasticsearch import ElasticsearchClient
-from src.storage.postgresql import PostgresClient
+from fastapi import APIRouter
+from elasticsearch import Elasticsearch
+from src.config import settings
 
 router = APIRouter()
-es_client = ElasticsearchClient()
-pg_client = PostgresClient()
 
 @router.get("/health")
 async def health_check():
-    """Check system health"""
-    try:
-        # Check Elasticsearch
-        es_health = await es_client.client.cluster.health()
-        
-        # Check PostgreSQL
-        async with pg_client.pool.acquire() as conn:
-            pg_health = await conn.fetchval("SELECT 1")
-        
-        return {
-            "status": "healthy",
-            "elasticsearch": es_health["status"],
-            "postgresql": "connected" if pg_health == 1 else "error"
+    """Check health of all services"""
+    # Initialize clients
+    es = Elasticsearch([f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"])
+    
+    # Check Elasticsearch
+    es_health = 1 if es.ping() else 0
+    
+    return {
+        "status": "ok" if all([es_health]) else "error",
+        "services": {
+            "elasticsearch": "connected" if es_health else "error"
         }
-    except Exception as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"System unhealthy: {str(e)}"
-        ) 
+    } 

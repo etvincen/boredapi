@@ -42,9 +42,6 @@ ENV/
 analysis_results/
 kibana/
 
-# TMP
-logstash/
-
 # Project specific
 logs/
 data/  # Development data directory
