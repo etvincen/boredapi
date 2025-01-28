@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 
 class Settings(BaseSettings):
     # API Settings
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_SCRAPES: int = 5
     SCRAPING_DELAY: float = 1.0  # seconds
     TARGET_DOMAIN: str
+    URL_BLACKLIST_PATTERNS: List[str] = ["nos-agences", "avis-de-deces"]  # URLs containing these patterns will be skipped
     
     class Config:
         env_file = ".env"

@@ -6,14 +6,37 @@ from datetime import datetime
 from typing import Dict, Any, List
 from src.storage.elasticsearch import ElasticsearchClient
 from src.storage.postgresql import PostgresClient
+from contextlib import asynccontextmanager
 
 logger = structlog.get_logger()
 
 class DataIngestion:
     def __init__(self):
-        self.es_client = ElasticsearchClient()
-        self.pg_client = PostgresClient()
-        
+        self.es_client = None
+        self.pg_client = None
+    
+    async def __aenter__(self):
+        """Initialize clients when entering context"""
+        try:
+            self.es_client = ElasticsearchClient()
+            self.pg_client = PostgresClient()
+            await self.init_storage()
+            return self
+        except Exception as e:
+            logger.error("Failed to initialize storage clients", error=str(e))
+            if self.es_client:
+                await self.es_client.close()
+            if self.pg_client:
+                await self.pg_client.close()
+            raise
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup clients when exiting context"""
+        if self.es_client:
+            await self.es_client.close()
+        if self.pg_client:
+            await self.pg_client.close()
+    
     async def init_storage(self):
         """Initialize storage connections and schemas"""
         # Initialize Elasticsearch indices
@@ -22,7 +45,7 @@ class DataIngestion:
         # Initialize PostgreSQL connection and tables
         await self.pg_client.init_pool()
         await self.pg_client.init_tables()
-        
+    
     async def get_latest_crawl_results(self) -> Dict[str, Any]:
         """Get the latest crawl results file"""
         crawl_dir = Path("crawl_results")
@@ -47,21 +70,28 @@ class DataIngestion:
             # Store in Elasticsearch
             content_id = await self.es_client.store_content(content)
             
-            # Store metadata in PostgreSQL
-            await self.pg_client.update_migration_status(
-                content_id=content_id,
-                url=content["url"],
-                status="completed"
-            )
+            # Extract metadata
+            metadata = {
+                'title': content.get('title'),
+                'content_type': content.get('type'),
+                'word_count': content.get('metadata', {}).get('word_count', 0),
+                'media': content.get('media', [])
+            }
             
-            # If content has hierarchy information, store it
-            if "hierarchy" in content:
-                await self.pg_client.store_hierarchy(
-                    content_id=content_id,
-                    parent_id=content["hierarchy"].get("parent_id"),
-                    level=content["hierarchy"].get("level", 0),
-                    path=content["hierarchy"].get("path", [])
-                )
+            # Extract hierarchy information
+            hierarchy = {
+                'parent_id': content.get('hierarchy', {}).get('parent_id'),
+                'level': content.get('hierarchy', {}).get('level', 0),
+                'path': content.get('hierarchy', {}).get('path', [])
+            }
+            
+            # Store metadata and hierarchy
+            await self.pg_client.store_content_metadata(
+                content_id=content_id,
+                url=content['url'],
+                metadata=metadata,
+                hierarchy=hierarchy
+            )
             
             return content_id
             
@@ -114,38 +144,29 @@ async def main():
     try:
         logger.info("Starting data ingestion")
         
-        ingestion = DataIngestion()
-        
-        # Initialize storage
-        logger.info("Initializing storage")
-        await ingestion.init_storage()
-        
-        # Get latest results
-        results = await ingestion.get_latest_crawl_results()
-        
-        # Process results
-        stats = await ingestion.process_results(results)
-        
-        logger.info(
-            "Data ingestion completed",
-            stored=stats["stored"],
-            failed=stats["failed"],
-            total=stats["total"]
-        )
-        
-        # Print summary
-        print("\nIngestion Summary:")
-        print(f"Total Documents: {stats['total']}")
-        print(f"Successfully Stored: {stats['stored']}")
-        print(f"Failed: {stats['failed']}")
+        async with DataIngestion() as ingestion:
+            # Get latest results
+            results = await ingestion.get_latest_crawl_results()
+            
+            # Process results
+            stats = await ingestion.process_results(results)
+            
+            logger.info(
+                "Data ingestion completed",
+                stored=stats["stored"],
+                failed=stats["failed"],
+                total=stats["total"]
+            )
+            
+            # Print summary
+            print("\nIngestion Summary:")
+            print(f"Total Documents: {stats['total']}")
+            print(f"Successfully Stored: {stats['stored']}")
+            print(f"Failed: {stats['failed']}")
         
     except Exception as e:
         logger.error("Data ingestion failed", error=str(e))
         raise
-    finally:
-        # Close connections
-        await ingestion.es_client.close()
-        await ingestion.pg_client.close()
 
 if __name__ == "__main__":
     asyncio.run(main()) 

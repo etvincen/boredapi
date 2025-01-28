@@ -37,6 +37,7 @@ ENV/
 # Project specific
 logs/
 data/  # Development data directory
+data/elasticsearch/*
 !data/.gitkeep
 
 # Crawler results

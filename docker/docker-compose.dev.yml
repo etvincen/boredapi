@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:15-alpine
     volumes:
-      - ${DEV_DATA_PATH:-./data}/postgres:/var/lib/postgresql/data
+      - ${DEV_DATA_PATH:-../data}/postgres:/var/lib/postgresql/data
     env_file:
       - ../.env
     ports:
@@ -18,10 +18,12 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - ELASTIC_USERNAME=elastic
+      - ELASTIC_PASSWORD=elastic
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - bootstrap.memory_lock=true
     volumes:
-      - ${DEV_DATA_PATH:-./data}/elasticsearch:/usr/share/elasticsearch/data
+      - ${DEV_DATA_PATH:-../data}/elasticsearch:/usr/share/elasticsearch/data
     user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "9200:9200"
@@ -34,11 +36,10 @@ services:
       memlock:
         soft: -1
         hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
 
 volumes:
   postgres_data_dev:
   elasticsearch_data_dev:
-
-networks:
-  scraper-dev-net:
-    driver: bridge 

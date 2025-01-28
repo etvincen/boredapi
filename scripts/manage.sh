@@ -22,32 +22,23 @@ init_dev_data() {
     if [ "$ENV" = "dev" ]; then
         echo "Initializing development data directories..."
         
-        # Clean up old data location if it exists
-        if [ -d "$PROJECT_ROOT/docker/data" ]; then
-            echo "Found old data directory in docker/data, moving to new location..."
-            mv "$PROJECT_ROOT/docker/data/postgres"/* "$PROJECT_ROOT/data/postgres/" 2>/dev/null || true
-            mv "$PROJECT_ROOT/docker/data/elasticsearch"/* "$PROJECT_ROOT/data/elasticsearch/" 2>/dev/null || true
-            rm -rf "$PROJECT_ROOT/docker/data"
-            echo "Old data moved to new location"
-        fi
-        
         # Create new data directories
-        mkdir -p "$PROJECT_ROOT/data/postgres"
-        mkdir -p "$PROJECT_ROOT/data/elasticsearch"
+        mkdir -p "$DEV_DATA_PATH/postgres"
+        mkdir -p "$DEV_DATA_PATH/elasticsearch"
         
         # Get current user and group ID
         local uid=$(id -u)
         local gid=$(id -g)
         
         # Set permissions for PostgreSQL
-        sudo chown -R $uid:$gid "$PROJECT_ROOT/data/postgres"
-        chmod 700 "$PROJECT_ROOT/data/postgres"
+        sudo chown -R $uid:$gid "$DEV_DATA_PATH/postgres"
+        chmod 700 "$DEV_DATA_PATH/postgres"
         
         # Set permissions for Elasticsearch
-        sudo chown -R $uid:$gid "$PROJECT_ROOT/data/elasticsearch"
-        chmod 755 "$PROJECT_ROOT/data/elasticsearch"
+        sudo chown -R $uid:$gid "$DEV_DATA_PATH/elasticsearch"
+        chmod 755 "$DEV_DATA_PATH/elasticsearch"
         
-        echo "Development data will be stored in: $PROJECT_ROOT/data"
+        echo "Development data will be stored in: $DEV_DATA_PATH"
         echo "Permissions set for user $uid:$gid"
     fi
 }
@@ -60,9 +51,26 @@ clean_dev_data() {
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo "Cleaning development data..."
-            rm -rf "$DEV_DATA_PATH/postgres"
-            rm -rf "$DEV_DATA_PATH/elasticsearch"
-            echo "Development data cleaned"
+            
+            # Stop containers first to release file locks
+            docker compose -f "$PROJECT_ROOT/docker/docker-compose.${ENV}.yml" down
+            
+            # Remove data with sudo
+            sudo rm -rf "$DEV_DATA_PATH/postgres"
+            sudo rm -rf "$DEV_DATA_PATH/elasticsearch"
+            
+            # Recreate directories with correct permissions
+            mkdir -p "$DEV_DATA_PATH/postgres" "$DEV_DATA_PATH/elasticsearch"
+            
+            # Set correct ownership
+            local uid=$(id -u)
+            local gid=$(id -g)
+            sudo chown -R $uid:$gid "$DEV_DATA_PATH/postgres"
+            sudo chown -R $uid:$gid "$DEV_DATA_PATH/elasticsearch"
+            sudo chmod 700 "$DEV_DATA_PATH/postgres"
+            sudo chmod 755 "$DEV_DATA_PATH/elasticsearch"
+            
+            echo "Development data cleaned and directories reset"
         fi
     else
         echo "Clean data only available in development environment"
@@ -121,13 +129,13 @@ check_services() {
     echo "Checking if required services are running..."
     local compose_file="docker/docker-compose.${ENV}.yml"
     
-    if ! docker compose -f "$PROJECT_ROOT/$compose_file" ps | grep -q "elasticsearch.*running"; then
+    if ! docker compose -f "$PROJECT_ROOT/$compose_file" ps | grep -q "elasticsearch-1"; then
         echo "Error: Elasticsearch service is not running"
         echo "Please start services first with: $0 start"
         exit 1
     fi
     
-    if ! docker compose -f "$PROJECT_ROOT/$compose_file" ps | grep -q "db.*running"; then
+    if ! docker compose -f "$PROJECT_ROOT/$compose_file" ps | grep -q "db-1"; then
         echo "Error: PostgreSQL service is not running"
         echo "Please start services first with: $0 start"
         exit 1

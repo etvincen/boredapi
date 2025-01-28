@@ -203,12 +203,20 @@ class WebCrawler:
     async def _extract_links(self, page) -> List[str]:
         """Extract valid links from the page"""
         try:
+            # First get all links that start with target domain
             links = await page.evaluate(f"""
                 () => Array.from(document.links)
                     .map(link => link.href)
                     .filter(href => href.startsWith('{settings.TARGET_DOMAIN}'))
             """)
-            return links
+            
+            # Then filter out blacklisted patterns
+            filtered_links = [
+                link for link in links
+                if not any(pattern in link for pattern in settings.URL_BLACKLIST_PATTERNS)
+            ]
+            
+            return filtered_links
         except Exception as e:
             logger.error("Error extracting links", error=str(e))
             return []
