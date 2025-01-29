@@ -1,20 +1,15 @@
 services:
   elasticsearch:
-    image: elasticsearch:8.11.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true
       - ELASTIC_PASSWORD=elastic123
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - bootstrap.memory_lock=true
-      - xpack.security.authc.api_key.enabled=true
-      - xpack.security.transport.ssl.enabled=false
-      - xpack.security.http.ssl.enabled=false
-      - INITIAL_KIBANA_PASSWORD=kibana123
     volumes:
       - ${DEV_DATA_PATH:-../data}/elasticsearch:/usr/share/elasticsearch/data
-      - ./setup-users.sh:/docker-entrypoint-initdb.d/setup-users.sh
-    user: "${UID:-1000}:${GID:-1000}"
+      - ./setup-users.sh:/setup-users.sh:rw
+      - es_tokens:/tokens
     ports:
       - "9200:9200"
     networks:
@@ -24,27 +19,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
+    command: >
+      /bin/bash -c "
+        chmod +x /setup-users.sh &&
+        /setup-users.sh &
+        /usr/local/bin/docker-entrypoint.sh elasticsearch
+      "
 
   kibana:
-    image: kibana:8.11.0
+    image: docker.elastic.co/kibana/kibana:8.11.0
     depends_on:
       elasticsearch:
         condition: service_healthy
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=kibana123
+      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=/tokens/kibana_token
       - XPACK_SECURITY_ENCRYPTIONKEY=something_at_least_32_characters
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=something_at_least_32_characters
-      - XPACK_REPORTING_ENCRYPTIONKEY=something_at_least_32_characters
-      - SERVER_SSL_ENABLED=false
+    volumes:
+      - ./setup_kibana.sh:/usr/local/bin/setup_kibana.sh:rw
+      - ../kibana/dashboards:/dashboards:ro
+      - es_tokens:/tokens
     ports:
       - "5601:5601"
     networks:
@@ -54,10 +48,20 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    command: >
+      /bin/bash -c "
+        while [ ! -f /tokens/kibana_token ]; do
+          echo 'Waiting for token file...'
+          sleep 5
+        done &&
+        TOKEN=$$(cat /tokens/kibana_token) &&
+        export ELASTICSEARCH_SERVICEACCOUNTTOKEN=$$TOKEN &&
+        /usr/local/bin/kibana-docker
+      "
 
 networks:
   elastic:
     driver: bridge
 
 volumes:
-  elasticsearch_data_dev:
+  es_tokens:
