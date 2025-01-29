@@ -8,6 +8,9 @@ from contextlib import asynccontextmanager
 import sys
 import json
 from pathlib import Path
+import time
+from datetime import datetime
+from typing import Optional
 
 logger = structlog.get_logger()
 
@@ -204,16 +207,20 @@ class WebCrawler:
         """Extract valid links from the page"""
         try:
             # First get all links that start with target domain
-            links = await page.evaluate(f"""
-                () => Array.from(document.links)
-                    .map(link => link.href)
-                    .filter(href => href.startsWith('{settings.TARGET_DOMAIN}'))
-            """)
+            links = await page.evaluate(f"""() => {{
+            return Array.from(document.querySelectorAll('a[href]'))
+                .map(a => a.href)
+                .filter(href => href.startsWith('{settings.crawler.TARGET_DOMAIN}'))
+                .filter(href => !href.includes('#'))
+                .filter(href => !href.endsWith('.pdf'))
+                .filter(href => !href.endsWith('.doc'))
+                .filter(href => !href.endsWith('.docx'));
+        }}""")
             
             # Then filter out blacklisted patterns
             filtered_links = [
                 link for link in links
-                if not any(pattern in link for pattern in settings.URL_BLACKLIST_PATTERNS)
+                if not any(pattern in link for pattern in settings.crawler.URL_BLACKLIST_PATTERNS)
             ]
             
             return filtered_links
@@ -288,7 +295,7 @@ class WebCrawler:
                     await self.state.update_stats(queued=queued)
                     
                     # Respect rate limiting
-                    await asyncio.sleep(settings.SCRAPING_DELAY)
+                    await asyncio.sleep(settings.crawler.SCRAPING_DELAY)
                     
                 except Exception as e:
                     logger.error(
@@ -322,50 +329,47 @@ class WebCrawler:
                     error=str(e)
                 )
     
-    async def crawl(self, start_url: str, max_duration: int = 3600):
-        """Main crawling method with timeout"""
-        logger.info("Initializing browser...")
-        async with self.browser_context():
-            logger.info("Browser initialized successfully")
-            
-            # Initialize with start URL
-            await self.state.queue.put(start_url)
-            await self.state.update_stats(queued=1)
-            
-            logger.info("Starting workers...", worker_count=settings.MAX_CONCURRENT_SCRAPES)
-            workers = [
-                self._worker(i) 
-                for i in range(settings.MAX_CONCURRENT_SCRAPES)
-            ]
-            
-            try:
+    async def crawl(self, start_url: str, max_duration: int = 3600) -> Dict[str, Any]:
+        """Start crawling from given URL"""
+        try:
+            async with self.browser_context():
+                # Initialize queue with start URL
+                await self.state.queue.put(start_url)
+                
+                # Start workers
+                logger.info("Starting workers...", worker_count=settings.crawler.MAX_CONCURRENT_SCRAPES)
+                workers = []
+                for i in range(settings.crawler.MAX_CONCURRENT_SCRAPES):
+                    worker = asyncio.create_task(self._worker(i))
+                    workers.append(worker)
+                
                 # Run workers with timeout
                 await asyncio.wait_for(
-                    asyncio.gather(*workers, return_exceptions=True),  # Add return_exceptions=True
+                    asyncio.gather(*workers, return_exceptions=True),
                     timeout=max_duration
                 )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Crawl timeout reached",
+                duration=max_duration,
+                processed=self.state.stats.total_processed
+            )
+        except Exception as e:
+            logger.error("Crawl error", error=str(e))
+        finally:
+            self.state.stop_crawling()
+            # Wait for queue to be empty with timeout
+            try:
+                await asyncio.wait_for(self.state.queue.join(), timeout=5)
             except asyncio.TimeoutError:
-                logger.warning(
-                    "Crawl timeout reached",
-                    duration=max_duration,
-                    processed=self.state.stats.total_processed
-                )
-            except Exception as e:
-                logger.error("Crawl error", error=str(e))
-            finally:
-                self.state.stop_crawling()
-                # Wait for queue to be empty with timeout
-                try:
-                    await asyncio.wait_for(self.state.queue.join(), timeout=5)
-                except asyncio.TimeoutError:
-                    logger.warning("Queue cleanup timed out")
-            
-            return {
-                "results": self.state.results,
-                "stats": self.state.stats.__dict__,
-                "storage": {
-                    "total_mb": self.state.storage_stats.total_mb,
-                    "usage_percentage": self.state.storage_stats.usage_percentage,
-                    "max_mb": self.state.storage_stats.max_bytes / (1024 * 1024)
-                }
-            } 
+                logger.warning("Queue cleanup timed out")
+        
+        return {
+            "results": self.state.results,
+            "stats": self.state.stats.__dict__,
+            "storage": {
+                "total_mb": self.state.storage_stats.total_mb,
+                "usage_percentage": self.state.storage_stats.usage_percentage,
+                "max_mb": self.state.storage_stats.max_bytes / (1024 * 1024)
+            }
+        } 

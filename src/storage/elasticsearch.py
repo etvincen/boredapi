@@ -7,10 +7,13 @@ logger = structlog.get_logger()
 
 class ElasticsearchClient:
     def __init__(self):
+        auth = None
+        if settings.elasticsearch.USERNAME:
+            auth = (settings.elasticsearch.USERNAME, settings.elasticsearch.PASSWORD)
+            
         self.client = AsyncElasticsearch(
-            hosts=[f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"],
-            basic_auth=(settings.ELASTICSEARCH_USERNAME, settings.ELASTICSEARCH_PASSWORD) 
-            if settings.ELASTICSEARCH_USERNAME else None
+            hosts=[f"http://{settings.elasticsearch.HOST}:{settings.elasticsearch.PORT}"],
+            basic_auth=auth
         )
         self.index = "content"
         

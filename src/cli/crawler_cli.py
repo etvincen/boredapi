@@ -17,7 +17,7 @@ async def run_crawler_test():
         
         # Run crawl operation
         results = await crawler.crawl(
-            start_url=settings.TARGET_DOMAIN,
+            start_url=settings.crawler.TARGET_DOMAIN,
             max_duration=3600
         )
         
@@ -36,9 +36,9 @@ async def run_crawler_test():
                     "storage": results["storage"],
                     "results": results["results"],
                     "config": {
-                        "target_domain": settings.TARGET_DOMAIN,
-                        "max_concurrent_scrapes": settings.MAX_CONCURRENT_SCRAPES,
-                        "scraping_delay": settings.SCRAPING_DELAY
+                        "target_domain": settings.crawler.TARGET_DOMAIN,
+                        "max_concurrent_scrapes": settings.crawler.MAX_CONCURRENT_SCRAPES,
+                        "scraping_delay": settings.crawler.SCRAPING_DELAY
                     }
                 },
                 f,

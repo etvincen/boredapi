@@ -41,16 +41,11 @@ def get_elasticsearch_client() -> Elasticsearch:
     """Get Elasticsearch client from environment variables"""
     es_host = os.getenv('ELASTICSEARCH_HOST', 'localhost')
     es_port = os.getenv('ELASTICSEARCH_PORT', '9200')
-    es_user = os.getenv('ELASTICSEARCH_USER')
-    es_pass = os.getenv('ELASTICSEARCH_PASSWORD')
     
-    if es_user and es_pass:
-        return Elasticsearch(
-            [f"http://{es_host}:{es_port}"],
-            basic_auth=(es_user, es_pass)
-        )
-    else:
-        return Elasticsearch([f"http://{es_host}:{es_port}"])
+    return Elasticsearch(
+        [f"http://{es_host}:{es_port}"],
+        basic_auth=("elastic", "elastic123")
+    )
 
 def main():
     try:

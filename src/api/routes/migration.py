@@ -14,10 +14,10 @@ async def start_migration(
     start_url: str
 ):
     """Start content migration"""
-    if not start_url.startswith(settings.TARGET_DOMAIN):
+    if not start_url.startswith(settings.crawler.TARGET_DOMAIN):
         raise HTTPException(
             status_code=400,
-            detail=f"URL must be within domain: {settings.TARGET_DOMAIN}"
+            detail=f"URL must be within domain: {settings.crawler.TARGET_DOMAIN}"
         )
     
     crawler = WebCrawler()
@@ -29,7 +29,7 @@ async def start_migration(
 async def get_migration_status():
     """Get current migration status"""
     try:
-        es = Elasticsearch([f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"])
+        es = Elasticsearch([f"http://{settings.elasticsearch.HOST}:{settings.elasticsearch.PORT}"])
         stats = es.indices.stats(index="roc_eclerc_content")
         count = es.count(index="roc_eclerc_content")
         

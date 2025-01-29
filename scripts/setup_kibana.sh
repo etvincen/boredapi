@@ -34,15 +34,17 @@ import_dashboards() {
     if [ ! -f "$dashboard_file" ]; then
         echo "Error: Dashboard file not found at $dashboard_file"
         exit 1
-    }
+    fi
     
     echo "Importing Kibana dashboards..."
-    
+    echo "hey KIBANA_USER: $KIBANA_USER"
+    echo "hey KIBANA_PASSWORD: $KIBANA_PASSWORD"
+
     # Import using Kibana API
     curl -X POST "http://$KIBANA_HOST:$KIBANA_PORT/api/saved_objects/_import" \
         -H "kbn-xsrf: true" \
-        -H "Content-Type: multipart/form-data" \
-        -F "file=@$dashboard_file" \
+        -H "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary" \
+        --form "file=@$dashboard_file" \
         -u "$KIBANA_USER:$KIBANA_PASSWORD"
         
     if [ $? -eq 0 ]; then

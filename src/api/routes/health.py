@@ -8,7 +8,7 @@ router = APIRouter()
 async def health_check():
     """Check health of all services"""
     # Initialize clients
-    es = Elasticsearch([f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"])
+    es = Elasticsearch([f"http://{settings.elasticsearch.HOST}:{settings.elasticsearch.PORT}"])
     
     # Check Elasticsearch
     es_health = 1 if es.ping() else 0
