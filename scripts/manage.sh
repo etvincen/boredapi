@@ -63,6 +63,9 @@ clean_data() {
     mkdir -p "$DEV_DATA_PATH/elasticsearch"
     sudo chown -R $uid:$gid "$DEV_DATA_PATH/elasticsearch"
     sudo chmod 700 "$DEV_DATA_PATH/elasticsearch"
+    
+    # Remove the es_tokens volume
+    docker volume rm boredapi_es_tokens 2>/dev/null || true
     echo "Data directories cleaned"
 }
 
@@ -72,7 +75,10 @@ case "$1" in
         # Check ports
         check_ports 9200 || { echo "Elasticsearch port (9200) is not available"; exit 1; }
         
-        # Start services
+        # Start services with setup profile
+        docker compose -f "$PROJECT_ROOT/docker/docker-compose.dev.yml" --profile setup up setup
+        
+        # Start main services
         docker compose -f "$PROJECT_ROOT/docker/docker-compose.dev.yml" up -d
         
         # Check service health

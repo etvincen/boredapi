@@ -1,6 +1,21 @@
 services:
+  # Init container to set up volume permissions
+  setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    user: root
+    volumes:
+      - es_tokens:/tokens
+    command: >
+      bash -c "
+        mkdir -p /tokens &&
+        chown -R 1000:0 /tokens &&
+        chmod 775 /tokens
+      "
+    profiles: ["setup"]
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    user: elasticsearch:root
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true
@@ -8,22 +23,34 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - ${DEV_DATA_PATH:-../data}/elasticsearch:/usr/share/elasticsearch/data
-      - ./setup-users.sh:/setup-users.sh:rw
+      - ./setup-users.sh:/setup-users.sh:ro
       - es_tokens:/tokens
     ports:
       - "9200:9200"
     networks:
       - elastic
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -u elastic:elastic123 http://localhost:9200 >/dev/null || exit 1"]
-      interval: 5s
+      test: ["CMD-SHELL", "curl -s -f -u elastic:elastic123 http://localhost:9200/_cat/health > /dev/null || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 5
     command: >
-      /bin/bash -c "
-        chmod +x /setup-users.sh &&
-        /setup-users.sh &
-        /usr/local/bin/docker-entrypoint.sh elasticsearch
+      bash -c "
+        # Start Elasticsearch
+        /usr/local/bin/docker-entrypoint.sh elasticsearch &
+        ES_PID=$!
+
+        # Wait for Elasticsearch to be fully ready
+        until curl -s -u elastic:elastic123 http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'; do
+          echo 'Waiting for Elasticsearch cluster to be ready...'
+          sleep 5
+        done
+
+        # Create service account token
+        bash /setup-users.sh
+
+        # Keep elasticsearch running
+        wait $ES_PID
       "
 
   kibana:
@@ -33,31 +60,40 @@ services:
         condition: service_healthy
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=/tokens/kibana_token
+      - ELASTICSEARCH_SSL_VERIFICATIONMODE=none
       - XPACK_SECURITY_ENCRYPTIONKEY=something_at_least_32_characters
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=something_at_least_32_characters
+      - XPACK_REPORTING_ENCRYPTIONKEY=something_at_least_32_characters
+      - NODE_OPTIONS="--max-old-space-size=512"
+      - LOGGING_ROOT_LEVEL=info
+      - LOGGING_VERBOSE=true
+      - ELASTIC_APM_ACTIVE=false
+      - SERVER_MAXPAYLOADBYTES=10485760
     volumes:
-      - ./setup_kibana.sh:/usr/local/bin/setup_kibana.sh:rw
-      - ../kibana/dashboards:/dashboards:ro
-      - es_tokens:/tokens
+      - es_tokens:/tokens:ro
+      - ./setup_kibana.sh:/usr/local/bin/setup_kibana.sh:ro
+      - ./kibana/dashboards:/dashboards:ro
     ports:
       - "5601:5601"
     networks:
       - elastic
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
+      test: ["CMD-SHELL", "curl -s -I http://localhost:5601/api/status | grep -q 'HTTP/1.1 200 OK'"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
     command: >
-      /bin/bash -c "
-        while [ ! -f /tokens/kibana_token ]; do
-          echo 'Waiting for token file...'
-          sleep 5
-        done &&
-        TOKEN=$$(cat /tokens/kibana_token) &&
-        export ELASTICSEARCH_SERVICEACCOUNTTOKEN=$$TOKEN &&
-        /usr/local/bin/kibana-docker
-      "
+      bash -c '
+        # Wait for token and set it in environment
+        /usr/local/bin/setup_kibana.sh wait-for-token &&
+        TOKEN=$(cat /tokens/kibana_token) &&
+        ELASTICSEARCH_SERVICEACCOUNTTOKEN=$TOKEN &&
+        export ELASTICSEARCH_SERVICEACCOUNTTOKEN &&
+        echo "Using tokennnnnnnnnn MAMAMAMAAMAQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQq: $ELASTICSEARCH_SERVICEACCOUNTTOKEN" &&
+        
+        # Start Kibana with token environment
+        env ELASTICSEARCH_SERVICEACCOUNTTOKEN=$TOKEN /usr/share/kibana/bin/kibana
+      '
 
 networks:
   elastic:
