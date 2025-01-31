@@ -25,29 +25,84 @@ class ContentIndexer:
         
     def prepare_document(self, page: Dict[str, Any]) -> Dict[str, Any]:
         """Transform a page into an Elasticsearch document"""
-        # Calculate content statistics with safety checks
-        content = page.get('content', '')
-        links = page.get('links', {'internal': [], 'external': [], 'resources': []})
-        images = page.get('images', [])
+        # Extract sections text for full-text search
+        sections_text = []
+        all_sections = []  # Track all sections regardless of nesting
+        section_levels = {1: 0, 2: 0, 3: 0}  # Count sections by level
         
-        content_stats = {
-            "text_length": len(content) if isinstance(content, str) else 0,
-            "section_count": 1,  # Since content is a string, we treat it as one section
-            "image_count": len(images),
-            "internal_link_count": len(links.get('internal', [])),
-            "external_link_count": len(links.get('external', [])),
-            "resource_link_count": len(links.get('resources', []))
+        def process_section(section, parent_path=""):
+            """Process a section and its subsections recursively"""
+            if section.get('title'):
+                sections_text.append(section['title'])
+            if section.get('text'):
+                sections_text.append(section['text'])
+                
+            # Track section level counts
+            level = section.get('level', 1)
+            section_levels[level] = section_levels.get(level, 0) + 1
+            
+            # Create section analytics entry
+            section_analytics = {
+                'title': section.get('title', ''),
+                'text': section.get('text', ''),
+                'level': level,
+                'path': f"{parent_path}/{section.get('title', '')}" if parent_path else section.get('title', ''),
+                'word_count': len(section.get('text', '').split()),
+                'has_images': bool(section.get('images')),
+                'image_count': len(section.get('images', []))
+            }
+            all_sections.append(section_analytics)
+            
+            # Process subsections
+            for subsection in section.get('subsections', []):
+                process_section(subsection, section_analytics['path'])
+        
+        # Process all sections
+        for section in page.get('sections', []):
+            process_section(section)
+        
+        # Prepare the main content structure
+        main_content = {
+            'text': ' '.join(sections_text),
+            'sections': page.get('sections', [])  # Keep original nested structure
         }
         
-        # Ensure timestamp is in proper format
-        if isinstance(page.get('timestamp'), str):
-            try:
-                datetime.fromisoformat(page['timestamp'].replace('Z', '+00:00'))
-            except ValueError:
-                page['timestamp'] = datetime.now().isoformat()
+        # Prepare metadata
+        metadata = page.get('metadata', {})
+        if 'last_updated' not in metadata and 'timestamp' in page:
+            metadata['last_updated'] = page['timestamp']
         
-        # Add content statistics to the document
-        doc = {**page, 'content_stats': content_stats}
+        # Calculate content statistics
+        content_stats = {
+            'word_count': len(main_content['text'].split()),
+            'text_length': len(main_content['text']),
+            'section_count': len(all_sections),
+            'sections_by_level': section_levels,
+            'paragraph_count': sum(1 for s in all_sections if s.get('text')),
+            'sections_with_images': sum(1 for s in all_sections if s.get('has_images')),
+            'total_images': sum(s.get('image_count', 0) for s in all_sections),
+            'average_section_length': sum(s.get('word_count', 0) for s in all_sections) / len(all_sections) if all_sections else 0
+        }
+        
+        # Prepare the document
+        doc = {
+            'url': page.get('url'),
+            'timestamp': page.get('timestamp', datetime.now().isoformat()),
+            'title': page.get('title'),
+            'meta_tags': page.get('meta_tags', {}),
+            'main_content': main_content,
+            'metadata': metadata,
+            'content_stats': content_stats,
+            'image_stats': page.get('image_stats', {}),
+            'section_analytics': {
+                'level_distribution': section_levels,
+                'sections_list': all_sections
+            }
+        }
+        
+        # Log document structure for debugging
+        logger.debug(f"Prepared document structure for {doc['url']}")
+        
         return doc
         
     def generate_bulk_actions(self, pages: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:

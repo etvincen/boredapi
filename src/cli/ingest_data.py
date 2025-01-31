@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 import os
 from datetime import datetime
 from ..elasticsearch.indexer import ContentIndexer
+from ..utils.parse_data import transform_content
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +48,37 @@ def get_elasticsearch_client() -> Elasticsearch:
         basic_auth=("elastic", "elastic123")
     )
 
+def save_transformed_results(transformed_data: Dict[str, Any]) -> Path:
+    """Save transformed results to file in the correct data directory"""
+    # Get the data directory from environment or use default
+    data_root = Path(os.getenv('DEV_DATA_PATH', '../data'))
+    
+    # Create the transformed_results directory inside the data directory
+    output_path = data_root / 'transformed_results'
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Also create a local transformed_results directory for easy access
+    local_output = Path('transformed_results')
+    local_output.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'transformed_{timestamp}.json'
+    
+    # Save to both locations
+    output_file = output_path / filename
+    local_file = local_output / filename
+    
+    # Save the file in both locations
+    for file_path in [output_file, local_file]:
+        with file_path.open('w', encoding='utf-8') as f:
+            json.dump(transformed_data, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"\nTransformed results saved to:")
+    logger.info(f"- Docker volume: {output_file}")
+    logger.info(f"- Local directory: {local_file}")
+    
+    return output_file
+
 def main():
     try:
         # Find latest crawl results
@@ -61,10 +93,23 @@ def main():
         logger.info("Loading crawl results...")
         crawl_data = load_crawl_results(latest_crawl)
         
-        # Index pages
-        logger.info(f"Indexing {len(crawl_data['results'])} pages...")
+        # Transform content
+        logger.info("Transforming content...")
+        transformed_data = transform_content(crawl_data)
+        
+        # Save transformed results
+        transformed_file = save_transformed_results(transformed_data)
+        
+        # Log transformation stats
+        logger.info("\n=== Transformation Results ===")
+        logger.info(f"Total pages: {transformed_data['stats']['total_pages']}")
+        logger.info(f"Successfully processed: {transformed_data['stats']['processed']}")
+        logger.info(f"Failed: {transformed_data['stats']['failed']}")
+        
+        # Index transformed pages
+        logger.info("\n=== Indexing Pages ===")
         indexer = ContentIndexer(get_elasticsearch_client())
-        result = indexer.index_pages(crawl_data['results'])
+        result = indexer.index_pages(transformed_data['pages'])
         
         logger.info("\n=== Indexing Complete ===")
         logger.info(f"Total pages: {result['total_pages']}")

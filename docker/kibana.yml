@@ -1,5 +1,7 @@
 # Core settings
 elasticsearch.hosts: ["http://elasticsearch:9200"]
+server.host: "0.0.0.0"  # Allow external access
+server.publicBaseUrl: "http://localhost:5601"  # Set public URL
 elasticsearch.username: "kibana_system"
 elasticsearch.password: "kibana123"
 elasticsearch.requestTimeout: 90000

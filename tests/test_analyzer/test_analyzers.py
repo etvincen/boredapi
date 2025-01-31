@@ -81,7 +81,7 @@ def analyze_all_pages(pages: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def main():
     # Load crawl results
-    crawl_path = Path('crawl_results/crawl_results_20250127_221009.json')
+    crawl_path = Path('crawl_results/crawl_results_20250131_130548.json')
     if not crawl_path.exists():
         logger.error(f"Crawl results file not found at {crawl_path}")
         return

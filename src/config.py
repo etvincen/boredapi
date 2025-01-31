@@ -11,8 +11,8 @@ class APISettings(BaseModel):
 
 class CrawlerSettings(BaseModel):
     TARGET_DOMAIN: str = "https://roc-eclerc.com/"
-    MAX_CONCURRENT_SCRAPES: int = 5
-    SCRAPING_DELAY: float = 1.0
+    MAX_CONCURRENT_SCRAPES: int = 3
+    SCRAPING_DELAY: float = 2.0
     URL_BLACKLIST_PATTERNS: List[str] = ["nos-agences", "avis-de-deces"]
 
     @field_validator('URL_BLACKLIST_PATTERNS', mode='before')

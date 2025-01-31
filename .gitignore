@@ -53,6 +53,11 @@ crawl_results/*.json
 !crawl_results/
 !crawl_results/.gitkeep
 
+# Transformed results
+transformed_results/*.json
+!transformed_results/
+!transformed_results/.gitkeep
+
 # Testing
 .coverage
 coverage.xml
