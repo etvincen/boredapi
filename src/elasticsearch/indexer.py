@@ -24,84 +24,69 @@ class ContentIndexer:
         logger.info(f"Created index {self.index_name}")
         
     def prepare_document(self, page: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform a page into an Elasticsearch document"""
-        # Extract sections text for full-text search
-        sections_text = []
-        all_sections = []  # Track all sections regardless of nesting
-        section_levels = {1: 0, 2: 0, 3: 0}  # Count sections by level
+        """Transform a page into an Elasticsearch document with flattened sections"""
+        # Initialize text collection
+        all_text = []
+        section_titles = []
         
-        def process_section(section, parent_path=""):
+        def process_section(section: Dict[str, Any]) -> None:
             """Process a section and its subsections recursively"""
+            # Add title if present
             if section.get('title'):
-                sections_text.append(section['title'])
-            if section.get('text'):
-                sections_text.append(section['text'])
+                section_titles.append(section['title'].strip())
                 
-            # Track section level counts
-            level = section.get('level', 1)
-            section_levels[level] = section_levels.get(level, 0) + 1
-            
-            # Create section analytics entry
-            section_analytics = {
-                'title': section.get('title', ''),
-                'text': section.get('text', ''),
-                'level': level,
-                'path': f"{parent_path}/{section.get('title', '')}" if parent_path else section.get('title', ''),
-                'word_count': len(section.get('text', '').split()),
-                'has_images': bool(section.get('images')),
-                'image_count': len(section.get('images', []))
-            }
-            all_sections.append(section_analytics)
-            
+            # Add text content
+            if section.get('text'):
+                all_text.append(section['text'].strip())
+                
             # Process subsections
             for subsection in section.get('subsections', []):
-                process_section(subsection, section_analytics['path'])
+                process_section(subsection)
         
         # Process all sections
         for section in page.get('sections', []):
             process_section(section)
+            
+        # Combine all text, removing extra whitespace and newlines
+        combined_text = ' '.join(text for text in all_text if text)
         
-        # Prepare the main content structure
-        main_content = {
-            'text': ' '.join(sections_text),
-            'sections': page.get('sections', [])  # Keep original nested structure
-        }
+        # Calculate basic statistics
+        word_count = len(combined_text.split()) if combined_text else 0
+        section_count = len(section_titles)
         
+        # Ensure timestamp is in ISO format
+        timestamp = page.get('timestamp')
+        if not timestamp:
+            timestamp = datetime.now().isoformat()
+        elif not isinstance(timestamp, str):
+            timestamp = timestamp.isoformat()
+            
         # Prepare metadata
-        metadata = page.get('metadata', {})
-        if 'last_updated' not in metadata and 'timestamp' in page:
-            metadata['last_updated'] = page['timestamp']
-        
-        # Calculate content statistics
-        content_stats = {
-            'word_count': len(main_content['text'].split()),
-            'text_length': len(main_content['text']),
-            'section_count': len(all_sections),
-            'sections_by_level': section_levels,
-            'paragraph_count': sum(1 for s in all_sections if s.get('text')),
-            'sections_with_images': sum(1 for s in all_sections if s.get('has_images')),
-            'total_images': sum(s.get('image_count', 0) for s in all_sections),
-            'average_section_length': sum(s.get('word_count', 0) for s in all_sections) / len(all_sections) if all_sections else 0
+        metadata = {
+            'language': page.get('metadata', {}).get('language', 'fr'),  # Default to French
+            'last_updated': timestamp,
+            'word_count': word_count,
+            'section_count': section_count
         }
         
         # Prepare the document
         doc = {
-            'url': page.get('url'),
-            'timestamp': page.get('timestamp', datetime.now().isoformat()),
-            'title': page.get('title'),
-            'meta_tags': page.get('meta_tags', {}),
-            'main_content': main_content,
-            'metadata': metadata,
-            'content_stats': content_stats,
-            'image_stats': page.get('image_stats', {}),
-            'section_analytics': {
-                'level_distribution': section_levels,
-                'sections_list': all_sections
-            }
+            'url': page.get('url', ''),  # Empty string if missing
+            'timestamp': timestamp,
+            'title': page.get('title', ''),  # Empty string if missing
+            'meta_tags': {
+                'description': page.get('meta_tags', {}).get('description', ''),
+                'keywords': page.get('meta_tags', {}).get('keywords', '')
+            },
+            'content': {
+                'text': combined_text,
+                'section_titles': section_titles if section_titles else []  # Empty list if no titles
+            },
+            'metadata': metadata
         }
         
         # Log document structure for debugging
-        logger.debug(f"Prepared document structure for {doc['url']}")
+        logger.debug(f"Prepared document for {doc['url']} with {word_count} words and {section_count} sections")
         
         return doc
         

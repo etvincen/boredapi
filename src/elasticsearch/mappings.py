@@ -37,10 +37,9 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                 }
             },
             "index": {
-                "max_result_window": 10000,
                 "mapping": {
-                    "nested_fields": {
-                        "limit": 100
+                    "total_fields": {
+                        "limit": 2000
                     }
                 }
             }
@@ -48,19 +47,30 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
         "mappings": {
             "properties": {
                 # Basic page information
-                "url": {"type": "keyword"},
-                "timestamp": {"type": "date"},
+                "url": {
+                    "type": "keyword",
+                    "index": True,
+                    "doc_values": True
+                },
+                "timestamp": {
+                    "type": "date",
+                    "format": "strict_date_optional_time||epoch_millis",
+                    "doc_values": True
+                },
                 "title": {
                     "type": "text",
                     "analyzer": "french_analyzer",
                     "fields": {
-                        "keyword": {"type": "keyword"}
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256,
+                            "doc_values": True
+                        }
                     }
                 },
                 
                 # Meta tags
                 "meta_tags": {
-                    "type": "object",
                     "properties": {
                         "description": {
                             "type": "text",
@@ -68,113 +78,34 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                         },
                         "keywords": {
                             "type": "text",
-                            "analyzer": "french_analyzer"
-                        }
-                    }
-                },
-                
-                # Main content
-                "main_content": {
-                    "properties": {
-                        "text": {
-                            "type": "text",
-                            "analyzer": "french_analyzer"
-                        },
-                        "sections": {
-                            "type": "nested",
-                            "include_in_root": False,
-                            "properties": {
-                                "title": {
-                                    "type": "text",
-                                    "analyzer": "french_analyzer",
-                                    "fields": {
-                                        "keyword": {"type": "keyword"}
-                                    }
-                                },
-                                "text": {
-                                    "type": "text",
-                                    "analyzer": "french_analyzer"
-                                },
-                                "level": {"type": "integer"},
-                                "images": {
-                                    "type": "nested",
-                                    "include_in_root": False,
-                                    "properties": {
-                                        "src": {"type": "keyword"},
-                                        "alt": {"type": "text"},
-                                        "title": {"type": "text"},
-                                        "width": {"type": "keyword"},
-                                        "height": {"type": "keyword"}
-                                    }
-                                },
-                                "subsections": {
-                                    "type": "nested",
-                                    "include_in_root": False
+                            "analyzer": "french_analyzer",
+                            "fields": {
+                                "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256
                                 }
                             }
                         }
                     }
                 },
                 
-                # Content statistics
-                "content_stats": {
+                # Content
+                "content": {
                     "properties": {
-                        "word_count": {"type": "integer"},
-                        "text_length": {"type": "integer"},
-                        "section_count": {"type": "integer"},
-                        "sections_by_level": {
-                            "properties": {
-                                "1": {"type": "integer"},
-                                "2": {"type": "integer"},
-                                "3": {"type": "integer"}
-                            }
+                        "text": {
+                            "type": "text",
+                            "analyzer": "french_analyzer",
+                            "fielddata": True  # Enable for aggregations
                         },
-                        "paragraph_count": {"type": "integer"},
-                        "sections_with_images": {"type": "integer"},
-                        "total_images": {"type": "integer"},
-                        "average_section_length": {"type": "float"}
-                    }
-                },
-                
-                # Image statistics
-                "image_stats": {
-                    "properties": {
-                        "total_count": {"type": "integer"},
-                        "with_alt": {"type": "integer"},
-                        "with_dimensions": {"type": "integer"},
-                        "types": {
-                            "properties": {
-                                "content": {"type": "integer"},
-                                "logos": {"type": "integer"}
-                            }
-                        }
-                    }
-                },
-                
-                # Section analytics
-                "section_analytics": {
-                    "properties": {
-                        "level_distribution": {
-                            "properties": {
-                                "1": {"type": "integer"},
-                                "2": {"type": "integer"},
-                                "3": {"type": "integer"}
-                            }
-                        },
-                        "sections_list": {
-                            "type": "nested",
-                            "include_in_root": False,
-                            "properties": {
-                                "title": {"type": "keyword"},
-                                "text": {
-                                    "type": "text",
-                                    "analyzer": "french_analyzer"
-                                },
-                                "level": {"type": "integer"},
-                                "path": {"type": "keyword"},
-                                "word_count": {"type": "integer"},
-                                "has_images": {"type": "boolean"},
-                                "image_count": {"type": "integer"}
+                        "section_titles": {
+                            "type": "text",
+                            "analyzer": "french_analyzer",
+                            "fields": {
+                                "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256,
+                                    "doc_values": True
+                                }
                             }
                         }
                     }
@@ -183,14 +114,23 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                 # Metadata
                 "metadata": {
                     "properties": {
-                        "language": {"type": "keyword"},
-                        "last_updated": {"type": "date"},
-                        "status_code": {"type": "integer"},
-                        "content_type": {"type": "keyword"},
-                        "response_time": {"type": "float"},
-                        "viewport": {"type": "keyword"},
-                        "description": {"type": "text", "analyzer": "french_analyzer"},
-                        "robots": {"type": "keyword"}
+                        "language": {
+                            "type": "keyword",
+                            "doc_values": True
+                        },
+                        "last_updated": {
+                            "type": "date",
+                            "format": "strict_date_optional_time||epoch_millis",
+                            "doc_values": True
+                        },
+                        "word_count": {
+                            "type": "integer",
+                            "doc_values": True
+                        },
+                        "section_count": {
+                            "type": "integer",
+                            "doc_values": True
+                        }
                     }
                 }
             }
