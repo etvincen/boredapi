@@ -40,7 +40,7 @@ ENV/
 
 # Analysis results
 analysis_results/
-kibana/
+!docker/kibana/dashboards/*
 
 # Project specific
 logs/

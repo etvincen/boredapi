@@ -1,0 +1,19 @@
+# Core settings
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "kibana123"
+elasticsearch.requestTimeout: 90000
+elasticsearch.requestHeadersWhitelist: ["Authorization", "securitytenant"]
+
+# Security settings
+xpack.security.enabled: true
+server.ssl.enabled: false
+
+# Reporting settings (to avoid warnings)
+xpack.reporting.kibanaServer.hostname: "localhost"
+xpack.reporting.roles.enabled: false
+
+# Encryption keys (to avoid random generation)
+xpack.security.encryptionKey: "a7a99c8c53a7426fb6f77b6b8ca1a8514ce629d3358c4e8ecc0a8c6e3a01fc4c"
+xpack.encryptedSavedObjects.encryptionKey: "a7a99c8c53a7426fb6f77b6b8ca1a8514ce629d3358c4e8ecc0a8c6e3a01fc4c"
+xpack.reporting.encryptionKey: "a7a99c8c53a7426fb6f77b6b8ca1a8514ce629d3358c4e8ecc0a8c6e3a01fc4c" 

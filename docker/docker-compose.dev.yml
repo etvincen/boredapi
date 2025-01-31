@@ -19,6 +19,10 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.authc.token.enabled=true
       - ELASTIC_PASSWORD=elastic123
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
@@ -46,7 +50,7 @@ services:
           sleep 5
         done
 
-        # Create service account token
+        # Set kibana_system user password
         bash /setup-users.sh
 
         # Keep elasticsearch running
@@ -59,20 +63,13 @@ services:
       elasticsearch:
         condition: service_healthy
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_SSL_VERIFICATIONMODE=none
-      - XPACK_SECURITY_ENCRYPTIONKEY=something_at_least_32_characters
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=something_at_least_32_characters
-      - XPACK_REPORTING_ENCRYPTIONKEY=something_at_least_32_characters
       - NODE_OPTIONS="--max-old-space-size=512"
       - LOGGING_ROOT_LEVEL=info
       - LOGGING_VERBOSE=true
-      - ELASTIC_APM_ACTIVE=false
-      - SERVER_MAXPAYLOADBYTES=10485760
     volumes:
-      - es_tokens:/tokens:ro
-      - ./setup_kibana.sh:/usr/local/bin/setup_kibana.sh:ro
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml:ro
       - ./kibana/dashboards:/dashboards:ro
+      - ./setup_kibana.sh:/usr/local/bin/setup_kibana.sh:ro
     ports:
       - "5601:5601"
     networks:
@@ -84,15 +81,14 @@ services:
       retries: 3
     command: >
       bash -c '
-        # Wait for token and set it in environment
-        /usr/local/bin/setup_kibana.sh wait-for-token &&
-        TOKEN=$(cat /tokens/kibana_token) &&
-        ELASTICSEARCH_SERVICEACCOUNTTOKEN=$TOKEN &&
-        export ELASTICSEARCH_SERVICEACCOUNTTOKEN &&
-        echo "Using tokennnnnnnnnn MAMAMAMAAMAQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQq: $ELASTICSEARCH_SERVICEACCOUNTTOKEN" &&
+        # Start Kibana in background
+        /usr/share/kibana/bin/kibana &
         
-        # Start Kibana with token environment
-        env ELASTICSEARCH_SERVICEACCOUNTTOKEN=$TOKEN /usr/share/kibana/bin/kibana
+        # Import dashboard (script handles waiting)
+        /usr/local/bin/setup_kibana.sh
+        
+        # Wait for Kibana process
+        wait
       '
 
 networks:

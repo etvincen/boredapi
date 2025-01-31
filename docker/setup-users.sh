@@ -13,37 +13,28 @@ until curl -s -u elastic:elastic123 http://localhost:9200/_cluster/health | grep
 done
 echo "Elasticsearch is ready"
 
-# Step 1: Create role with full privileges
-echo "Creating custom_kibana_admin role..."
-curl -X PUT -u elastic:elastic123 \
-    "http://localhost:9200/_security/role/custom_kibana_admin" \
+# Set kibana_system user password
+echo "Setting kibana_system user password..."
+curl -X POST -u elastic:elastic123 \
+    "http://localhost:9200/_security/user/kibana_system/_password" \
     -H "Content-Type: application/json" \
-    -d '{
-      "cluster": ["all"],
-      "indices": [{"names": ["*"], "privileges": ["all"]}],
-      "applications": [{"application": "kibana-.kibana", "privileges": ["all"], "resources": ["*"]}]
-    }'
+    -d '{"password": "kibana123"}'
 
-# Step 2: Create service account (testing different endpoint)
-echo "Creating service account..."
-curl -X PUT -u elastic:elastic123 \
-    "http://localhost:9200/_security/service_account/elastic/kibana" \
-    -H "Content-Type: application/json" \
-    -d '{
-      "roles": ["custom_kibana_admin"]
-    }'
 
-# Step 3: Create token (only if previous steps succeeded)
-if [ $? -eq 0 ]; then
-    echo "Creating service account token..."
-    TOKEN_RESPONSE=$(curl -s -X POST -u elastic:elastic123 \
-        'http://localhost:9200/_security/service/elastic/kibana/credential/token/kibana-token')
-    
-    echo "Token response: $TOKEN_RESPONSE"
-    
-    TOKEN_VALUE=$(echo "$TOKEN_RESPONSE" | grep -o '"value":"[^"]*"' | cut -d'"' -f4)
-    [ -z "$TOKEN_VALUE" ] && { echo "Token creation failed: $TOKEN_RESPONSE"; exit 1; }
-    
-    echo "$TOKEN_VALUE" > /tokens/kibana_token
-    echo "Service account token created successfully"
-fi
+# Verify kibana_system user and roles
+echo "Verifying kibana_system user..."
+curl -s -u elastic:elastic123 \
+    "http://localhost:9200/_security/user/kibana_system" | grep -q "kibana_system" && \
+    echo "Kibana system user verified"
+
+echo "Kibana system user password set successfully"
+
+# Get detailed info about kibana_system user
+echo "Getting kibana_system user details..."
+curl -s -u elastic:elastic123 \
+    "http://localhost:9200/_security/user/kibana_system?pretty"
+
+# Test specific endpoint access
+echo "Testing nodes endpoint access..."
+curl -s -u kibana_system:kibana123 \
+    "http://localhost:9200/_nodes?filter_path=nodes.*.version" || echo "Failed to access nodes endpoint"
