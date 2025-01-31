@@ -1,0 +1,51 @@
+{
+  "objects": [
+    {
+      "version": "7.17.0",
+      "type": "dashboard",
+      "id": "content-overview",
+      "attributes": {
+        "title": "Content Overview",
+        "description": "Overview of crawled content statistics",
+        "hits": 0,
+        "panels": [
+          {
+            "id": "total-pages",
+            "type": "visualization",
+            "attributes": {
+              "title": "Total Pages",
+              "visState": {
+                "type": "metric",
+                "aggs": [
+                  {
+                    "id": "1",
+                    "type": "count",
+                    "schema": "metric"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "version": "7.17.0",
+      "type": "visualization",
+      "id": "total-pages",
+      "attributes": {
+        "title": "Total Pages",
+        "visState": {
+          "type": "metric",
+          "aggs": [
+            {
+              "id": "1",
+              "type": "count",
+              "schema": "metric"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
