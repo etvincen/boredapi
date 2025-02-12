@@ -37,6 +37,7 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                 }
             },
             "index": {
+                "number_of_replicas": 0,
                 "mapping": {
                     "total_fields": {
                         "limit": 2000
