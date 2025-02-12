@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from ..elasticsearch.indexer import ContentIndexer
 from ..utils.parse_data import transform_content
+from ..nlp.processor import NLPProcessor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def get_elasticsearch_client() -> Elasticsearch:
         basic_auth=("elastic", "elastic123")
     )
 
-def save_transformed_results(transformed_data: Dict[str, Any]) -> Path:
+def save_transformed_results(transformed_data: Dict[str, Any], nlp_data: Dict[str, Any]) -> Path:
     """Save transformed results to file in the correct data directory"""
     # Get the data directory from environment or use default
     data_root = Path(os.getenv('DEV_DATA_PATH', '../data'))
@@ -64,6 +65,12 @@ def save_transformed_results(transformed_data: Dict[str, Any]) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f'transformed_{timestamp}.json'
     
+    # Combine transformed data with NLP data
+    output_data = {
+        **transformed_data,
+        'nlp_stats': nlp_data
+    }
+    
     # Save to both locations
     output_file = output_path / filename
     local_file = local_output / filename
@@ -71,7 +78,7 @@ def save_transformed_results(transformed_data: Dict[str, Any]) -> Path:
     # Save the file in both locations
     for file_path in [output_file, local_file]:
         with file_path.open('w', encoding='utf-8') as f:
-            json.dump(transformed_data, f, ensure_ascii=False, indent=2)
+            json.dump(output_data, f, ensure_ascii=False, indent=2)
     
     logger.info(f"\nTransformed results saved to:")
     logger.info(f"- Docker volume: {output_file}")
@@ -97,8 +104,16 @@ def main():
         logger.info("Transforming content...")
         transformed_data = transform_content(crawl_data)
         
-        # Save transformed results
-        transformed_file = save_transformed_results(transformed_data)
+        # Process with NLP
+        logger.info("\n=== Running NLP Processing ===")
+        nlp_processor = NLPProcessor()
+        processed_docs, corpus_stats = nlp_processor.process_documents(transformed_data['pages'])
+        
+        # Update transformed data with NLP-processed documents
+        transformed_data['pages'] = processed_docs
+        
+        # Save transformed results with NLP data
+        transformed_file = save_transformed_results(transformed_data, corpus_stats)
         
         # Log transformation stats
         logger.info("\n=== Transformation Results ===")

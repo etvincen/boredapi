@@ -26,6 +26,9 @@ pandas = "^2.2.3"
 beautifulsoup4 = "^4.12.3"
 Pillow = "^10.2.0"
 python-logstash = "^0.4.8"
+spacy = "^3.8.4"
+scikit-learn = "^1.6.1"
+numpy = "^2.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

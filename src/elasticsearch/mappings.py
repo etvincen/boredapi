@@ -112,6 +112,54 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                     }
                 },
                 
+                # NLP Features
+                "nlp_features": {
+                    "properties": {
+                        # Topic modeling results
+                        "topics": {
+                            "properties": {
+                                "topic_id": {"type": "integer"},
+                                "probability": {"type": "float"},
+                                "terms": {
+                                    "properties": {
+                                        "term": {"type": "keyword"},
+                                        "weight": {"type": "float"}
+                                    }
+                                }
+                            }
+                        },
+                        # Keywords with frequencies
+                        "keywords": {
+                            "properties": {
+                                "text": {"type": "keyword"},
+                                "weight": {"type": "float"}
+                            }
+                        },
+                        # Named entities
+                        "named_entities": {
+                            "properties": {
+                                "text": {"type": "keyword"},
+                                "label": {"type": "keyword"}
+                            }
+                        },
+                        # Noun chunks for potential key phrases
+                        "noun_chunks": {
+                            "type": "keyword"
+                        }
+                    }
+                },
+                
+                # Content Statistics
+                "content_stats": {
+                    "properties": {
+                        "word_count": {"type": "integer"},
+                        "sentence_count": {"type": "integer"},
+                        "avg_word_length": {"type": "float"},
+                        "avg_sentence_length": {"type": "float"},
+                        "section_count": {"type": "integer"}
+                    }
+                },
+                
                 # Metadata
                 "metadata": {
                     "properties": {
@@ -122,14 +170,6 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                         "last_updated": {
                             "type": "date",
                             "format": "strict_date_optional_time||epoch_millis",
-                            "doc_values": True
-                        },
-                        "word_count": {
-                            "type": "integer",
-                            "doc_values": True
-                        },
-                        "section_count": {
-                            "type": "integer",
                             "doc_values": True
                         }
                     }
