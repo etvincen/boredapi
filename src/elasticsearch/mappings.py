@@ -4,173 +4,54 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
     """Get Elasticsearch mappings for web content"""
     return {
         "settings": {
-            "analysis": {
-                "analyzer": {
-                    "french_analyzer": {
-                        "type": "custom",
-                        "tokenizer": "standard",
-                        "filter": [
-                            "lowercase",
-                            "french_elision",
-                            "french_stop",
-                            "french_stemmer"
-                        ]
-                    }
-                },
-                "filter": {
-                    "french_elision": {
-                        "type": "elision",
-                        "articles_case": True,
-                        "articles": [
-                            "l", "m", "t", "qu", "n", "s", "j", "d", "c", "jusqu", "quoiqu",
-                            "lorsqu", "puisqu"
-                        ]
-                    },
-                    "french_stop": {
-                        "type": "stop",
-                        "stopwords": "_french_"
-                    },
-                    "french_stemmer": {
-                        "type": "stemmer",
-                        "language": "light_french"
-                    }
-                }
-            },
-            "index": {
-                "number_of_replicas": 0,
-                "mapping": {
-                    "total_fields": {
-                        "limit": 2000
-                    }
-                }
-            }
+            "number_of_shards": 1,
+            "number_of_replicas": 0,
+            "refresh_interval": "1s"
         },
         "mappings": {
             "properties": {
-                # Basic page information
                 "url": {
-                    "type": "keyword",
-                    "index": True,
-                    "doc_values": True
-                },
-                "timestamp": {
-                    "type": "date",
-                    "format": "strict_date_optional_time||epoch_millis",
-                    "doc_values": True
+                    "type": "keyword"
                 },
                 "title": {
-                    "type": "text",
-                    "analyzer": "french_analyzer",
-                    "fields": {
-                        "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256,
-                            "doc_values": True
-                        }
-                    }
+                    "type": "text"
                 },
-                
-                # Meta tags
-                "meta_tags": {
-                    "properties": {
-                        "description": {
-                            "type": "text",
-                            "analyzer": "french_analyzer"
-                        },
-                        "keywords": {
-                            "type": "text",
-                            "analyzer": "french_analyzer",
-                            "fields": {
-                                "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256
-                                }
-                            }
-                        }
-                    }
+                "raw_text": {
+                    "type": "text"
                 },
-                
-                # Content
-                "content": {
+                "topics": {
+                    "type": "nested",
                     "properties": {
-                        "text": {
-                            "type": "text",
-                            "analyzer": "french_analyzer",
-                            "fielddata": True  # Enable for aggregations
-                        },
-                        "section_titles": {
-                            "type": "text",
-                            "analyzer": "french_analyzer",
-                            "fields": {
-                                "keyword": {
-                                    "type": "keyword",
-                                    "ignore_above": 256,
-                                    "doc_values": True
-                                }
-                            }
-                        }
-                    }
-                },
-                
-                # NLP Features
-                "nlp_features": {
-                    "properties": {
-                        # Topic modeling results
-                        "topics": {
-                            "properties": {
-                                "topic_id": {"type": "integer"},
-                                "probability": {"type": "float"},
-                                "terms": {
-                                    "properties": {
-                                        "term": {"type": "keyword"},
-                                        "weight": {"type": "float"}
-                                    }
-                                }
-                            }
-                        },
-                        # Keywords with frequencies
-                        "keywords": {
-                            "properties": {
-                                "text": {"type": "keyword"},
-                                "weight": {"type": "float"}
-                            }
-                        },
-                        # Named entities
-                        "named_entities": {
-                            "properties": {
-                                "text": {"type": "keyword"},
-                                "label": {"type": "keyword"}
-                            }
-                        },
-                        # Noun chunks for potential key phrases
-                        "noun_chunks": {
+                        "name": {
                             "type": "keyword"
+                        },
+                        "probability": {
+                            "type": "float"
                         }
                     }
                 },
-                
-                # Content Statistics
-                "content_stats": {
+                "statistics": {
                     "properties": {
-                        "word_count": {"type": "integer"},
-                        "sentence_count": {"type": "integer"},
-                        "avg_word_length": {"type": "float"},
-                        "avg_sentence_length": {"type": "float"},
-                        "section_count": {"type": "integer"}
-                    }
-                },
-                
-                # Metadata
-                "metadata": {
-                    "properties": {
-                        "language": {
-                            "type": "keyword",
-                            "doc_values": True
+                        "word_count": {
+                            "type": "integer"
                         },
-                        "last_updated": {
-                            "type": "date",
-                            "format": "strict_date_optional_time||epoch_millis",
-                            "doc_values": True
+                        "sentence_count": {
+                            "type": "integer"
+                        },
+                        "section_count": {
+                            "type": "integer"
+                        },
+                        "external_link_count": {
+                            "type": "integer"
+                        },
+                        "internal_link_count": {
+                            "type": "integer"
+                        },
+                        "image_count": {
+                            "type": "integer"
+                        },
+                        "avg_words_per_sentence": {
+                            "type": "float"
                         }
                     }
                 }
@@ -184,8 +65,4 @@ def get_index_name() -> str:
 
 def get_index_settings() -> Dict[str, Any]:
     """Get index creation settings"""
-    mappings = get_elasticsearch_mappings()
-    return {
-        "settings": mappings["settings"],
-        "mappings": mappings["mappings"]
-    } 
+    return get_elasticsearch_mappings() 

@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from .mappings import get_index_settings, get_index_name
 import time
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -12,83 +13,116 @@ class ContentIndexer:
     def __init__(self, es_client: Elasticsearch):
         self.es = es_client
         self.index_name = get_index_name()
+        self.batch_size = 10  # Add batch size as instance variable
         
-    def create_index(self) -> None:
-        """Create the Elasticsearch index with proper mappings"""
-        if self.es.indices.exists(index=self.index_name):
-            logger.info(f"Index {self.index_name} already exists")
-            return
+    def create_index(self, force_recreate: bool = False) -> None:
+        """Create the Elasticsearch index with proper mappings
+        
+        Args:
+            force_recreate: If True, delete existing index and create new one
+        """
+        try:
+            exists = self.es.indices.exists(index=self.index_name)
             
-        settings = get_index_settings()
-        self.es.indices.create(index=self.index_name, body=settings)
-        logger.info(f"Created index {self.index_name}")
+            if exists and not force_recreate:
+                logger.info(f"Index {self.index_name} already exists")
+                return
+                
+            if exists:
+                logger.info(f"Deleting existing index {self.index_name}")
+                self.es.indices.delete(index=self.index_name)
+                time.sleep(1)  # Brief pause after deletion
+            
+            # Create new index
+            settings = get_index_settings()
+            self.es.indices.create(index=self.index_name, body=settings)
+            logger.info(f"Created fresh index {self.index_name}")
+            time.sleep(1)  # Brief pause after creation
+            
+            # Wait for index to be ready
+            for _ in range(3):  # Try up to 3 times
+                if self.es.indices.exists(index=self.index_name):
+                    break
+                time.sleep(1)
+            
+        except Exception as e:
+            logger.error(f"Error creating index: {str(e)}")
+            raise
         
-    def prepare_document(self, page: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform a page into an Elasticsearch document with flattened sections"""
-        # Initialize text collection
+    def prepare_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare a document for indexing with all required fields and statistics"""
+        # Extract topics from NLP features
+        topics = []
+        if 'nlp_features' in doc and 'topics' in doc['nlp_features']:
+            for topic in doc['nlp_features']['topics']:
+                topics.append({
+                    'name': topic['name'],
+                    'probability': topic['probability']
+                })
+        
+        # Collect all text and calculate statistics
         all_text = []
-        section_titles = []
+        section_count = 0
+        internal_links = 0
+        external_links = 0
+        image_count = 0
         
         def process_section(section: Dict[str, Any]) -> None:
             """Process a section and its subsections recursively"""
-            # Add title if present
+            nonlocal section_count, internal_links, external_links, image_count
+            
+            section_count += 1
+            
             if section.get('title'):
-                section_titles.append(section['title'].strip())
-                
-            # Add text content
+                all_text.append(section['title'].strip())
+            
             if section.get('text'):
                 all_text.append(section['text'].strip())
-                
-            # Process subsections
+            
+            # Count links and images
+            if 'links' in section:
+                for link in section['links']:
+                    if link.get('is_internal', False):
+                        internal_links += 1
+                    else:
+                        external_links += 1
+            
+            if 'images' in section:
+                image_count += len(section['images'])
+            
             for subsection in section.get('subsections', []):
                 process_section(subsection)
         
         # Process all sections
-        for section in page.get('sections', []):
+        for section in doc.get('sections', []):
             process_section(section)
-            
-        # Combine all text, removing extra whitespace and newlines
-        combined_text = ' '.join(text for text in all_text if text)
         
-        # Calculate basic statistics
-        word_count = len(combined_text.split()) if combined_text else 0
-        section_count = len(section_titles)
+        # Combine all text
+        raw_text = ' '.join(text for text in all_text if text)
         
-        # Ensure timestamp is in ISO format
-        timestamp = page.get('timestamp')
-        if not timestamp:
-            timestamp = datetime.now().isoformat()
-        elif not isinstance(timestamp, str):
-            timestamp = timestamp.isoformat()
-            
-        # Prepare metadata
-        metadata = {
-            'language': page.get('metadata', {}).get('language', 'fr'),  # Default to French
-            'last_updated': timestamp,
-            'word_count': word_count,
-            'section_count': section_count
+        # Calculate text statistics
+        sentences = [s.strip() for s in raw_text.split('.') if s.strip()]
+        sentence_count = len(sentences)
+        words = raw_text.split()
+        word_count = len(words)
+        avg_words_per_sentence = word_count / sentence_count if sentence_count > 0 else 0
+        
+        # Prepare the document with all fields
+        return {
+            'url': doc.get('url', ''),
+            'title': doc.get('title', ''),
+            'raw_text': raw_text,
+            'topics': topics,
+            'statistics': {
+                'word_count': word_count,
+                'sentence_count': sentence_count,
+                'section_count': section_count,
+                'external_link_count': external_links,
+                'internal_link_count': internal_links,
+                'image_count': image_count,
+                'avg_words_per_sentence': round(avg_words_per_sentence, 2)
+            }
         }
-        
-        # Prepare the document
-        doc = {
-            'url': page.get('url', ''),  # Empty string if missing
-            'timestamp': timestamp,
-            'title': page.get('title', ''),  # Empty string if missing
-            'meta_tags': {
-                'description': page.get('meta_tags', {}).get('description', ''),
-                'keywords': page.get('meta_tags', {}).get('keywords', '')
-            },
-            'content': {
-                'text': combined_text,
-                'section_titles': section_titles if section_titles else []  # Empty list if no titles
-            },
-            'metadata': metadata
-        }
-        
-        # Log document structure for debugging
-        logger.debug(f"Prepared document for {doc['url']} with {word_count} words and {section_count} sections")
-        
-        return doc
         
     def generate_bulk_actions(self, pages: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
         """Generate actions for bulk indexing"""
@@ -100,59 +134,77 @@ class ContentIndexer:
                 "_source": doc
             }
             
-    def index_pages(self, pages: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Index multiple pages using bulk API"""
+    def index_pages(self, documents: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Index a list of documents"""
+        if not documents:
+            return {'total_pages': 0, 'indexed': 0, 'failed': 0}
+        
         try:
-            # Create index if it doesn't exist
-            self.create_index()
+            # Always recreate the index for consistency
+            self.create_index(force_recreate=True)
+        
+            # Prepare bulk indexing operations
+            operations = []
+            for doc in documents:
+                try:
+                    prepared_doc = self.prepare_document(doc)
+                    # Each operation needs both the action and source lines
+                    operations.append({"index": {"_index": self.index_name, "_id": prepared_doc['url']}})
+                    operations.append(prepared_doc)
+                except Exception as e:
+                    logger.error(f"Error preparing document for indexing: {str(e)}")
             
-            # Process in smaller batches
-            batch_size = 10  # Reduced from 100
-            total_pages = len(pages)
-            total_indexed = 0
-            total_failed = 0
+            # Perform bulk indexing with progress bar
+            total_docs = len(documents)
+            indexed = 0
+            failed = 0
             
-            for i in range(0, total_pages, batch_size):
-                batch = pages[i:i + batch_size]
-                logger.info(f"Processing batch {i//batch_size + 1} of {(total_pages + batch_size - 1)//batch_size}")
-                
-                # Perform bulk indexing for this batch
-                success, failed = bulk(
-                    self.es,
-                    self.generate_bulk_actions(batch),
-                    chunk_size=batch_size,
-                    raise_on_error=False,
-                    request_timeout=30  # Add timeout
-                )
-                
-                total_indexed += success
-                total_failed += len(failed)
-                
-                # Add a small delay between batches
-                if i + batch_size < total_pages:
-                    time.sleep(1)  # 1 second delay between batches
+            if operations:
+                try:
+                    with tqdm(total=total_docs, desc="Indexing documents", unit="doc") as pbar:
+                        for i in range(0, len(operations), self.batch_size * 2):  # *2 because each doc has 2 lines
+                            batch = operations[i:i + self.batch_size * 2]
+                            try:
+                                response = self.es.bulk(operations=batch, refresh=True)
+                                
+                                # Count successes and failures
+                                for item in response['items']:
+                                    if item['index']['status'] == 201 or item['index']['status'] == 200:
+                                        indexed += 1
+                                    else:
+                                        failed += 1
+                                        logger.error(f"Failed to index document: {item['index']['error']}")
+                                    pbar.update(1)
+                                    
+                            except Exception as e:
+                                logger.error(f"Error during bulk indexing: {str(e)}")
+                                failed += len(batch) // 2  # Divide by 2 because each doc has 2 lines
+                                pbar.update(len(batch) // 2)
+                    
+                    # Final refresh
+                    self.es.indices.refresh(index=self.index_name)
+                    time.sleep(1)  # Give ES time to complete the refresh
+                    
+                except Exception as e:
+                    logger.error(f"Error during bulk indexing: {str(e)}")
+                    failed = total_docs - indexed
             
             return {
-                "total_pages": total_pages,
-                "indexed": total_indexed,
-                "failed": total_failed
+                'total_pages': total_docs,
+                'indexed': indexed,
+                'failed': failed
             }
             
         except Exception as e:
-            logger.error(f"Error during indexing: {e}")
+            logger.error(f"Error during indexing process: {str(e)}")
             raise
-            
+        
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the index"""
-        try:
-            stats = self.es.indices.stats(index=self.index_name)
-            count = self.es.count(index=self.index_name)
-            
-            return {
-                "doc_count": count['count'],
-                "store_size": stats['indices'][self.index_name]['total']['store']['size_in_bytes'],
-                "indexing": stats['indices'][self.index_name]['total']['indexing']
-            }
-        except Exception as e:
-            logger.error(f"Error getting index stats: {str(e)}")
-            return {} 
+        stats = self.es.indices.stats(index=self.index_name)
+        doc_count = self.es.count(index=self.index_name)
+        
+        return {
+            'doc_count': doc_count['count'],
+            'store_size': stats['indices'][self.index_name]['total']['store']['size_in_bytes']
+        } 

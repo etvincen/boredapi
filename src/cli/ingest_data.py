@@ -8,6 +8,7 @@ from datetime import datetime
 from ..elasticsearch.indexer import ContentIndexer
 from ..utils.parse_data import transform_content
 from ..nlp.processor import NLPProcessor
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,6 +35,8 @@ def load_crawl_results(file_path: Path) -> Dict[str, Any]:
     try:
         with file_path.open('r', encoding='utf-8') as f:
             data = json.load(f)
+        pages = data.get('results', [])
+        logger.info(f"Loaded {len(pages)} pages")
         return data
     except Exception as e:
         logger.error(f"Error loading crawl results: {str(e)}")
@@ -88,56 +91,70 @@ def save_transformed_results(transformed_data: Dict[str, Any], nlp_data: Dict[st
 
 def main():
     try:
-        # Find latest crawl results
+        print("\n=== Starting Content Processing Pipeline ===")
+        
+        # Find and load crawl results
         latest_crawl = find_latest_crawl_results()
         if not latest_crawl:
             logger.error("No crawl results found")
             return
-            
-        logger.info(f"Found latest crawl results: {latest_crawl}")
         
-        # Load crawl results
-        logger.info("Loading crawl results...")
         crawl_data = load_crawl_results(latest_crawl)
         
+        # Take only 40 documents
+        crawl_data['results'] = crawl_data['results'][:40]
+        print(f"\nSelected {len(crawl_data['results'])} documents for processing")
+        
         # Transform content
-        logger.info("Transforming content...")
+        print("\n1. Transforming HTML Content")
         transformed_data = transform_content(crawl_data)
+        total_pages = len(transformed_data.get('pages', []))
+        print(f"Transformed {total_pages} pages")
         
         # Process with NLP
-        logger.info("\n=== Running NLP Processing ===")
+        print("\n2. Running NLP Processing")
         nlp_processor = NLPProcessor()
-        processed_docs, corpus_stats = nlp_processor.process_documents(transformed_data['pages'])
         
-        # Update transformed data with NLP-processed documents
+        # Process all pages with progress bar
+        pages = transformed_data['pages']
+        processed_docs = []
+        
+        for page in tqdm(pages, desc="Processing documents", unit="doc"):
+            try:
+                processed_doc, _ = nlp_processor.process_documents([page])
+                if processed_doc:
+                    processed_docs.extend(processed_doc)
+            except Exception as e:
+                logger.error(f"Error processing document {page.get('url', 'unknown')}: {str(e)}")
+        
+        # Calculate corpus stats at the end
+        _, corpus_stats = nlp_processor.process_documents(pages)  # Use all pages for corpus stats
+        
+        print(f"\nSuccessfully processed {len(processed_docs)} documents")
+        
+        # Save results
+        print("\n3. Saving Transformed Results")
         transformed_data['pages'] = processed_docs
-        
-        # Save transformed results with NLP data
         transformed_file = save_transformed_results(transformed_data, corpus_stats)
         
-        # Log transformation stats
-        logger.info("\n=== Transformation Results ===")
-        logger.info(f"Total pages: {transformed_data['stats']['total_pages']}")
-        logger.info(f"Successfully processed: {transformed_data['stats']['processed']}")
-        logger.info(f"Failed: {transformed_data['stats']['failed']}")
-        
-        # Index transformed pages
-        logger.info("\n=== Indexing Pages ===")
+        # Index pages
+        print("\n4. Indexing in Elasticsearch")
         indexer = ContentIndexer(get_elasticsearch_client())
-        result = indexer.index_pages(transformed_data['pages'])
+        result = indexer.index_pages(processed_docs)
         
-        logger.info("\n=== Indexing Complete ===")
-        logger.info(f"Total pages: {result['total_pages']}")
-        logger.info(f"Successfully indexed: {result['indexed']}")
-        logger.info(f"Failed: {result['failed']}")
+        print("\n=== Processing Complete ===")
+        print(f"Total pages processed: {result['total_pages']}")
+        print(f"Successfully indexed: {result['indexed']}")
+        print(f"Failed: {result['failed']}")
         
         # Get index stats
-        index_stats = indexer.es.indices.stats(index=indexer.index_name)
-        doc_count = indexer.es.count(index=indexer.index_name)
-        
-        logger.info("\n=== Index Statistics ===")
-        logger.info(f"Documents in index: {doc_count['count']}")
-        logger.info(f"Index size: {index_stats['indices'][indexer.index_name]['total']['store']['size_in_bytes'] / 1024 / 1024:.2f} MB")
+        try:
+            stats = indexer.get_index_stats()
+            print(f"\nIndex Statistics:")
+            print(f"Documents in index: {stats['doc_count']}")
+            print(f"Index size: {stats['store_size'] / 1024 / 1024:.2f} MB")
+        except Exception as e:
+            logger.error(f"Error getting index stats: {str(e)}")
         
     except Exception as e:
         logger.error(f"Error during ingestion: {e}")

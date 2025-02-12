@@ -56,19 +56,6 @@ check_service_health() {
     return 1
 }
 
-# Function to clean data directories
-clean_data() {
-    echo "Cleaning data directories..."
-    sudo rm -rf "$DEV_DATA_PATH/elasticsearch"
-    mkdir -p "$DEV_DATA_PATH/elasticsearch"
-    sudo chown -R $uid:$gid "$DEV_DATA_PATH/elasticsearch"
-    sudo chmod 700 "$DEV_DATA_PATH/elasticsearch"
-    
-    # Remove the es_tokens volume
-    docker volume rm boredapi_es_tokens 2>/dev/null || true
-    echo "Data directories cleaned"
-}
-
 # Command handling
 case "$1" in
     start)
@@ -87,10 +74,6 @@ case "$1" in
         
     stop)
         docker compose -f "$PROJECT_ROOT/docker/docker-compose.dev.yml" down
-        ;;
-        
-    clean)
-        clean_data
         ;;
         
     status)
