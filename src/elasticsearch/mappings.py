@@ -6,7 +6,18 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
         "settings": {
             "number_of_shards": 1,
             "number_of_replicas": 0,
-            "refresh_interval": "1s"
+            "refresh_interval": "1s",
+            "analysis": {
+                "analyzer": {
+                    "french_exact": {  # For exact token matching
+                        "type": "custom",
+                        "tokenizer": "standard",
+                        "filter": [
+                            "lowercase"
+                        ]
+                    }
+                }
+            }
         },
         "mappings": {
             "properties": {
@@ -19,8 +30,13 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                 "raw_text": {
                     "type": "text"
                 },
+                "preprocessed_keywords": {
+                    "type": "text",
+                    "analyzer": "french_exact",
+                    "similarity": "BM25"  # Explicitly set BM25 similarity
+                },
                 "topics": {
-                    "type": "nested",
+                    "type": "object",
                     "properties": {
                         "name": {
                             "type": "keyword"

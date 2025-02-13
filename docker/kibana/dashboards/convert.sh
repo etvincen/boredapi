@@ -9,32 +9,32 @@ cd "$SCRIPT_DIR"
 if [ "$1" = "to-ndjson" ]; then
     # Convert pretty JSON to NDJSON
     echo "Converting debug.json to ndjson..."
-    if ! jq -c '.objects[]' "$SCRIPT_DIR/content_analysis.debug.json" > "$SCRIPT_DIR/content_analysis.ndjson" 2>/dev/null; then
+    if ! jq -c '.objects[]' "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json" > "$SCRIPT_DIR/roc_eclerc_dashboard.ndjson" 2>/dev/null; then
         echo "Warning: No objects found in debug.json or file is empty"
-        echo "" > "$SCRIPT_DIR/content_analysis.ndjson"
+        echo "" > "$SCRIPT_DIR/roc_eclerc_dashboard.ndjson"
     fi
     echo "Done!"
 elif [ "$1" = "to-json" ]; then
     # Convert NDJSON to pretty JSON for debugging
     echo "Converting ndjson to debug.json..."
     echo '{
-      "objects": [' > "$SCRIPT_DIR/content_analysis.debug.json"
+      "objects": [' > "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json"
 
     # Add each line from NDJSON with proper formatting
     while IFS= read -r line; do
         # Skip empty lines
         [ -z "$line" ] && continue
         # Add the line with proper indentation
-        echo "    $line," >> "$SCRIPT_DIR/content_analysis.debug.json"
-    done < "$SCRIPT_DIR/content_analysis.ndjson"
+        echo "    $line," >> "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json"
+    done < "$SCRIPT_DIR/roc_eclerc_dashboard.ndjson"
 
     # Remove the last comma and close the JSON
-    sed -i '$ s/,$//' "$SCRIPT_DIR/content_analysis.debug.json"
+    sed -i '$ s/,$//' "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json"
     echo '  ]
-}' >> "$SCRIPT_DIR/content_analysis.debug.json"
+}' >> "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json"
 
     # Pretty print the final JSON
-    jq '.' "$SCRIPT_DIR/content_analysis.debug.json" > "$SCRIPT_DIR/temp" && mv "$SCRIPT_DIR/temp" "$SCRIPT_DIR/content_analysis.debug.json"
+    jq '.' "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json" > "$SCRIPT_DIR/temp" && mv "$SCRIPT_DIR/temp" "$SCRIPT_DIR/roc_eclerc_dashboard.debug.json"
     echo "NDJSON converted to debug.json successfully!"
 else
     echo "Usage: $0 [to-ndjson|to-json]"

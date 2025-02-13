@@ -1,0 +1,149 @@
+{
+  "objects": [
+    {
+      "type": "dashboard",
+      "id": "roc-eclerc-dashboard",
+      "namespaces": ["default"],
+      "attributes": {
+        "title": "Roc Eclerc Content Analysis",
+        "hits": 0,
+        "description": "Content analysis dashboard for Roc Eclerc website",
+        "panelsJSON": "[{\"version\":\"8.9.0\",\"type\":\"visualization\",\"gridData\":{\"x\":0,\"y\":0,\"w\":12,\"h\":2,\"i\":\"1\"},\"panelIndex\":\"1\",\"title\":\"Total Documents\",\"embeddableConfig\":{\"enhancements\":{}}},{\"version\":\"8.9.0\",\"type\":\"visualization\",\"gridData\":{\"x\":0,\"y\":2,\"w\":12,\"h\":4,\"i\":\"2\"},\"panelIndex\":\"2\",\"title\":\"URL Selector\",\"embeddableConfig\":{\"enhancements\":{}}},{\"version\":\"8.9.0\",\"type\":\"visualization\",\"gridData\":{\"x\":0,\"y\":6,\"w\":12,\"h\":3,\"i\":\"3\"},\"panelIndex\":\"3\",\"title\":\"Page Title\",\"embeddableConfig\":{\"enhancements\":{}}},{\"version\":\"8.9.0\",\"type\":\"visualization\",\"gridData\":{\"x\":0,\"y\":9,\"w\":12,\"h\":6,\"i\":\"4\"},\"panelIndex\":\"4\",\"title\":\"Content Statistics\",\"embeddableConfig\":{\"enhancements\":{}}},{\"version\":\"8.9.0\",\"type\":\"visualization\",\"gridData\":{\"x\":12,\"y\":0,\"w\":12,\"h\":8,\"i\":\"5\"},\"panelIndex\":\"5\",\"title\":\"Content Keywords\",\"embeddableConfig\":{\"enhancements\":{}}},{\"version\":\"8.9.0\",\"type\":\"visualization\",\"gridData\":{\"x\":0,\"y\":15,\"w\":24,\"h\":6,\"i\":\"6\"},\"panelIndex\":\"6\",\"title\":\"Topic Distribution\",\"embeddableConfig\":{\"enhancements\":{}}}]",
+        "optionsJSON": "{\"useMargins\":true,\"syncColors\":false,\"hidePanelTitles\":false}",
+        "timeRestore": false,
+        "refreshInterval": {
+          "pause": true,
+          "value": 0
+        },
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      },
+      "references": [
+        {
+          "name": "1",
+          "type": "visualization",
+          "id": "roc-eclerc-document-count"
+        },
+        {
+          "name": "2",
+          "type": "visualization",
+          "id": "roc-eclerc-url-selector"
+        },
+        {
+          "name": "3",
+          "type": "visualization",
+          "id": "roc-eclerc-page-title"
+        },
+        {
+          "name": "4",
+          "type": "visualization",
+          "id": "roc-eclerc-statistics"
+        },
+        {
+          "name": "5",
+          "type": "visualization",
+          "id": "roc-eclerc-word-cloud"
+        },
+        {
+          "name": "6",
+          "type": "visualization",
+          "id": "roc-eclerc-topics"
+        }
+      ],
+      "managed": false,
+      "updated_at": "2025-02-13T11:30:00.000Z",
+      "created_at": "2025-02-13T11:30:00.000Z",
+      "version": "WzEwLDZd",
+      "migrationVersion": {
+        "dashboard": "8.9.0"
+      },
+      "coreMigrationVersion": "8.8.0",
+      "typeMigrationVersion": "8.9.0"
+    },
+    {
+      "type": "visualization",
+      "id": "roc-eclerc-document-count",
+      "attributes": {
+        "title": "Total Documents",
+        "visState": "{\"type\":\"metric\",\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{\"customLabel\":\"Total Documents\"}}],\"params\":{\"addTooltip\":true,\"addLegend\":false,\"type\":\"metric\",\"metric\":{\"percentageMode\":false,\"useRanges\":false,\"colorSchema\":\"Green to Red\",\"metricColorMode\":\"None\",\"colorsRange\":[{\"from\":0,\"to\":10000}],\"labels\":{\"show\":true},\"invertColors\":false,\"style\":{\"bgFill\":\"#000\",\"bgColor\":false,\"labelColor\":false,\"subText\":\"\",\"fontSize\":40}}}}",
+        "uiStateJSON": "{}",
+        "description": "Total unique documents count",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "type": "visualization",
+      "id": "roc-eclerc-url-selector",
+      "attributes": {
+        "title": "URL Selector",
+        "visState": "{\"type\":\"controls\",\"params\":{\"controls\":[{\"id\":\"1682363147016\",\"indexPattern\":\"roc_eclerc_content\",\"fieldName\":\"url\",\"parent\":\"\",\"label\":\"Select URL\",\"type\":\"list\",\"options\":{\"type\":\"terms\",\"multiselect\":false,\"dynamicOptions\":true,\"size\":50,\"order\":\"asc\"}}],\"updateFiltersOnChange\":true,\"useTimeFilter\":false,\"pinFilters\":false},\"aggs\":[]}",
+        "uiStateJSON": "{}",
+        "description": "URL selector for filtering content",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "type": "visualization",
+      "id": "roc-eclerc-page-title",
+      "attributes": {
+        "title": "Page Title",
+        "visState": "{\"type\":\"markdown\",\"params\":{\"fontSize\":14,\"openLinksInNewTab\":false,\"markdown\":\"{{ title }}\"}}",
+        "uiStateJSON": "{}",
+        "description": "Current page title",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "type": "visualization",
+      "id": "roc-eclerc-statistics",
+      "attributes": {
+        "title": "Content Statistics",
+        "visState": "{\"type\":\"metric\",\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"statistics.word_count\",\"customLabel\":\"Word Count\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"statistics.sentence_count\",\"customLabel\":\"Sentence Count\"}},{\"id\":\"3\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"statistics.section_count\",\"customLabel\":\"Section Count\"}},{\"id\":\"4\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"statistics.internal_link_count\",\"customLabel\":\"Internal Links\"}},{\"id\":\"5\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"statistics.external_link_count\",\"customLabel\":\"External Links\"}},{\"id\":\"6\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"statistics.image_count\",\"customLabel\":\"Images\"}}]}",
+        "uiStateJSON": "{}",
+        "description": "Content statistics metrics",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "type": "visualization",
+      "id": "roc-eclerc-word-cloud",
+      "attributes": {
+        "title": "Content Keywords",
+        "visState": "{\"type\":\"tagcloud\",\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"preprocessed_keywords\",\"orderBy\":\"_count\",\"order\":\"desc\",\"size\":50,\"minFontSize\":14,\"maxFontSize\":28}}]}",
+        "uiStateJSON": "{}",
+        "description": "Word cloud of preprocessed keywords",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "type": "visualization",
+      "id": "roc-eclerc-topics",
+      "attributes": {
+        "title": "Topic Distribution",
+        "visState": "{\"type\":\"horizontal_bar\",\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"topics.probability\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"topics.name\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"}}]}",
+        "uiStateJSON": "{}",
+        "description": "Topic distribution bar chart",
+        "version": 1,
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      }
+    }
+  ]
+} 

@@ -6,6 +6,7 @@ from datetime import datetime
 from .mappings import get_index_settings, get_index_name
 import time
 from tqdm import tqdm
+from ..nlp.preprocessor import TextPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class ContentIndexer:
         self.es = es_client
         self.index_name = get_index_name()
         self.batch_size = 10  # Add batch size as instance variable
+        self.preprocessor = TextPreprocessor()
         
     def create_index(self, force_recreate: bool = False) -> None:
         """Create the Elasticsearch index with proper mappings
@@ -57,7 +59,7 @@ class ContentIndexer:
             for topic in doc['nlp_features']['topics']:
                 topics.append({
                     'name': topic['name'],
-                    'probability': topic['probability']
+                    'probability': round(topic['probability'], 3)  # Round to 3 decimal places
                 })
         
         # Collect all text and calculate statistics
@@ -79,17 +81,18 @@ class ContentIndexer:
             if section.get('text'):
                 all_text.append(section['text'].strip())
             
-            # Count links and images
-            if 'links' in section:
-                for link in section['links']:
-                    if link.get('is_internal', False):
-                        internal_links += 1
-                    else:
-                        external_links += 1
+            # Count links from the section
+            for link in section.get('links', []):
+                if link.get('is_internal', False):
+                    internal_links += 1
+                else:
+                    external_links += 1
             
+            # Count images
             if 'images' in section:
                 image_count += len(section['images'])
             
+            # Process subsections recursively
             for subsection in section.get('subsections', []):
                 process_section(subsection)
         
@@ -97,26 +100,32 @@ class ContentIndexer:
         for section in doc.get('sections', []):
             process_section(section)
         
-        # Combine all text
+        # Combine all text with proper spacing
         raw_text = ' '.join(text for text in all_text if text)
         
         # Calculate text statistics
         sentences = [s.strip() for s in raw_text.split('.') if s.strip()]
         sentence_count = len(sentences)
-        words = raw_text.split()
+        words = [w for w in raw_text.split() if w.strip()]  # Filter out empty strings
         word_count = len(words)
         avg_words_per_sentence = word_count / sentence_count if sentence_count > 0 else 0
+        
+        # Get preprocessed keywords using TextPreprocessor
+        preprocessed = self.preprocessor.process_document(doc)
+        # Join tokens with proper spacing and ensure no empty tokens
+        preprocessed_keywords = ' '.join(token for token in preprocessed['lemmatized_tokens'] if token.strip())
         
         # Prepare the document with all fields
         return {
             'url': doc.get('url', ''),
             'title': doc.get('title', ''),
             'raw_text': raw_text,
-            'topics': topics,
+            'preprocessed_keywords': preprocessed_keywords,
+                    'topics': topics,
             'statistics': {
-                'word_count': word_count,
+                    'word_count': word_count,
                 'sentence_count': sentence_count,
-                'section_count': section_count,
+                    'section_count': section_count,
                 'external_link_count': external_links,
                 'internal_link_count': internal_links,
                 'image_count': image_count,
@@ -198,13 +207,13 @@ class ContentIndexer:
         except Exception as e:
             logger.error(f"Error during indexing process: {str(e)}")
             raise
-        
+            
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the index"""
-        stats = self.es.indices.stats(index=self.index_name)
+            stats = self.es.indices.stats(index=self.index_name)
         doc_count = self.es.count(index=self.index_name)
-        
-        return {
-            'doc_count': doc_count['count'],
-            'store_size': stats['indices'][self.index_name]['total']['store']['size_in_bytes']
-        } 
+            
+            return {
+        'doc_count': doc_count['count'],
+        'store_size': stats['indices'][self.index_name]['total']['store']['size_in_bytes']
+            }

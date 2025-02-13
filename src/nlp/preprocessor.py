@@ -19,7 +19,15 @@ class TextPreprocessor:
         # Custom stop words in addition to spaCy's
         self.custom_stop_words = {
             "roc", "eclerc", "cookies", "javascript", "navigation",
-            "menu", "site", "cliquez", "voir", "plus"
+            "menu", "site", "cliquez", "voir", "plus", "roceclerc",
+            "pour", "et", "de", "le", "la", "les", "un", "une",
+            "des", "du", "au", "aux", "avec", "par", "sur", "dans",
+            "en", "vers", "chez", "donc", "car", "mais", "ou", "où",
+            "qui", "que", "quoi", "dont", "alors", "si", "très",
+            "comment", "pourquoi", "quand", "votre", "nos", "notre",
+            "vos", "leur", "leurs", "mon", "ton", "son", "mes", "tes",
+            "ses", "ce", "cet", "cette", "ces", "celui", "celle",
+            "ceux", "celles", "autre", "autres", "même", "mêmes"
         }
         
         # Add custom stop words to spaCy

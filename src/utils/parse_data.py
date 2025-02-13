@@ -80,10 +80,10 @@ class ContentParser:
         current_section = None
         
         # Process all headings and their content
-        for element in main_content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'img']):
+        for element in main_content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'img', 'a']):
             if element.name.startswith('h'):
                 # Start new section when heading is found
-                if current_section and (current_section['text'] or current_section['images']):
+                if current_section and (current_section['text'] or current_section['images'] or current_section['links']):
                     sections.append(current_section)
                 
                 level = int(element.name[1])
@@ -94,14 +94,28 @@ class ContentParser:
                     'level': level,
                     'text': '',
                     'images': [],
+                    'links': [],
                     'subsections': []
                 }
             elif element.name == 'p' and current_section:
                 # Add paragraph text to current section
                 text = element.get_text(strip=True)
                 if text and text not in seen_text:
-                    current_section['text'] += f"{text}\n"
+                    # Add text with proper spacing - ensure single newline between paragraphs
+                    if current_section['text']:
+                        current_section['text'] = current_section['text'].rstrip() + '\n\n'
+                    current_section['text'] += text
                     seen_text.add(text)
+                
+                # Process any links within the paragraph
+                for link in element.find_all('a', href=True):
+                    href = link['href']
+                    is_internal = not href.startswith(('http', 'https')) or (self.current_url and href.startswith(self.current_url))
+                    current_section['links'].append({
+                        'url': href,
+                        'text': link.get_text(strip=True),
+                        'is_internal': is_internal
+                    })
             elif element.name == 'img' and current_section:
                 # Add image to current section
                 src = element.get('src', '')
@@ -113,9 +127,19 @@ class ContentParser:
                         'width': element.get('width', ''),
                         'height': element.get('height', '')
                     })
+            elif element.name == 'a' and current_section:
+                # Process standalone links
+                href = element.get('href')
+                if href:
+                    is_internal = not href.startswith(('http', 'https')) or (self.current_url and href.startswith(self.current_url))
+                    current_section['links'].append({
+                        'url': href,
+                        'text': element.get_text(strip=True),
+                        'is_internal': is_internal
+                    })
         
         # Add last section if it exists
-        if current_section and (current_section['text'] or current_section['images']):
+        if current_section and (current_section['text'] or current_section['images'] or current_section['links']):
             sections.append(current_section)
         
         # Organize sections hierarchically
