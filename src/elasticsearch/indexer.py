@@ -210,10 +210,10 @@ class ContentIndexer:
             
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the index"""
-            stats = self.es.indices.stats(index=self.index_name)
+        stats = self.es.indices.stats(index=self.index_name)
         doc_count = self.es.count(index=self.index_name)
             
-            return {
+        return {
         'doc_count': doc_count['count'],
         'store_size': stats['indices'][self.index_name]['total']['store']['size_in_bytes']
-            }
+        }

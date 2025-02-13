@@ -68,6 +68,8 @@ htmlcov/
 
 # Docker
 docker-compose.override.yml
+docker/kibana/dashboards/*.txt
+
 
 # Temporary files
 *.log

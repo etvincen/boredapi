@@ -3,7 +3,9 @@
     {
       "type": "dashboard",
       "id": "roc-eclerc-dashboard",
-      "namespaces": ["default"],
+      "namespaces": [
+        "default"
+      ],
       "attributes": {
         "title": "Roc Eclerc Content Analysis",
         "hits": 0,
@@ -54,12 +56,7 @@
       "managed": false,
       "updated_at": "2025-02-13T11:30:00.000Z",
       "created_at": "2025-02-13T11:30:00.000Z",
-      "version": "WzEwLDZd",
-      "migrationVersion": {
-        "dashboard": "8.9.0"
-      },
-      "coreMigrationVersion": "8.8.0",
-      "typeMigrationVersion": "8.9.0"
+      "version": "WzEwLDZd"
     },
     {
       "type": "visualization",
@@ -71,7 +68,7 @@
         "description": "Total unique documents count",
         "version": 1,
         "kibanaSavedObjectMeta": {
-          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+          "searchSourceJSON": "{\"index\":\"dv_content_id\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
         }
       }
     },
@@ -80,12 +77,12 @@
       "id": "roc-eclerc-url-selector",
       "attributes": {
         "title": "URL Selector",
-        "visState": "{\"type\":\"controls\",\"params\":{\"controls\":[{\"id\":\"1682363147016\",\"indexPattern\":\"roc_eclerc_content\",\"fieldName\":\"url\",\"parent\":\"\",\"label\":\"Select URL\",\"type\":\"list\",\"options\":{\"type\":\"terms\",\"multiselect\":false,\"dynamicOptions\":true,\"size\":50,\"order\":\"asc\"}}],\"updateFiltersOnChange\":true,\"useTimeFilter\":false,\"pinFilters\":false},\"aggs\":[]}",
+        "visState": "{\"type\":\"controls\",\"params\":{\"controls\":[{\"id\":\"1682363147016\",\"indexPattern\":\"dv_content_id\",\"fieldName\":\"url\",\"parent\":\"\",\"label\":\"Select URL\",\"type\":\"list\",\"options\":{\"type\":\"terms\",\"multiselect\":false,\"dynamicOptions\":true,\"size\":50,\"order\":\"asc\"}}],\"updateFiltersOnChange\":true,\"useTimeFilter\":false,\"pinFilters\":false},\"aggs\":[]}",
         "uiStateJSON": "{}",
         "description": "URL selector for filtering content",
         "version": 1,
         "kibanaSavedObjectMeta": {
-          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+          "searchSourceJSON": "{\"index\":\"dv_content_id\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
         }
       }
     },
@@ -99,7 +96,7 @@
         "description": "Current page title",
         "version": 1,
         "kibanaSavedObjectMeta": {
-          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+          "searchSourceJSON": "{\"index\":\"dv_content_id\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
         }
       }
     },
@@ -113,7 +110,7 @@
         "description": "Content statistics metrics",
         "version": 1,
         "kibanaSavedObjectMeta": {
-          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+          "searchSourceJSON": "{\"index\":\"dv_content_id\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
         }
       }
     },
@@ -127,7 +124,7 @@
         "description": "Word cloud of preprocessed keywords",
         "version": 1,
         "kibanaSavedObjectMeta": {
-          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+          "searchSourceJSON": "{\"index\":\"dv_content_id\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
         }
       }
     },
@@ -141,9 +138,9 @@
         "description": "Topic distribution bar chart",
         "version": 1,
         "kibanaSavedObjectMeta": {
-          "searchSourceJSON": "{\"index\":\"roc_eclerc_content\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+          "searchSourceJSON": "{\"index\":\"dv_content_id\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
         }
       }
     }
   ]
-} 
+}

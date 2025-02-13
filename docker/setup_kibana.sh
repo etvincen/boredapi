@@ -53,7 +53,6 @@ function create_data_view() {
                 \"id\": \"${default_id}\",
                 \"type\": \"data_view\",
                 \"timeFieldName\": \"\",
-                \"fields\": {},
                 \"sourceFilters\": [],
                 \"fieldFormats\": {},
                 \"runtimeFieldMap\": {}
