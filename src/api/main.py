@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Roc Eclerc Search API",
+    title=settings.PROJECT_NAME,
     description="API for hybrid search (BM25 + vector similarity) over Roc Eclerc content",
-    version="1.0.0"
+    version="1.0.0",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
 # Add CORS middleware
@@ -27,7 +28,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Response models
+# Request/Response models
+class SearchRequest(BaseModel):
+    q: str
+    size: int = 10
+    min_score: Optional[float] = None
+    include_stats: bool = False
+
+class SuggestRequest(BaseModel):
+    q: str
+    size: int = 5
+
 class SearchResult(BaseModel):
     url: str
     title: str
@@ -67,15 +78,10 @@ async def health_check():
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-@app.get("/search", response_model=SearchResponse)
-async def search(
-    q: str = Query(..., description="Search query"),
-    size: int = Query(10, ge=1, le=50, description="Number of results"),
-    min_score: Optional[float] = Query(None, ge=0, description="Minimum score threshold"),
-    include_stats: bool = Query(False, description="Include document statistics in results")
-) -> SearchResponse:
+@app.post("/search", response_model=SearchResponse)
+async def search_post(request: SearchRequest) -> SearchResponse:
     """
-    Perform hybrid search over the content
+    Perform hybrid search over the content using POST
     
     This endpoint combines traditional keyword search (BM25) with semantic search using
     sentence embeddings. The results are ranked using a combination of both signals.
@@ -86,10 +92,10 @@ async def search(
         
         # Perform hybrid search
         results = search_service.hybrid_search(
-            query=q,
-            size=size,
-            min_score=min_score,
-            include_stats=include_stats
+            query=request.q,
+            size=request.size,
+            min_score=request.min_score,
+            include_stats=request.include_stats
         )
         
         # Transform to response model
@@ -101,7 +107,7 @@ async def search(
                 score=result['score'],
                 text_preview=result['text_preview']
             )
-            if include_stats and 'statistics' in result:
+            if request.include_stats and 'statistics' in result:
                 search_result.statistics = result['statistics']
             search_results.append(search_result)
             
@@ -115,12 +121,20 @@ async def search(
         logger.error(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/suggest")
-async def suggest(
-    q: str = Query(..., description="Partial query to get suggestions for"),
-    size: int = Query(5, ge=1, le=10, description="Number of suggestions")
-) -> List[str]:
-    """Get search suggestions based on partial input"""
+@app.get("/search", response_model=SearchResponse)
+async def search_get(
+    q: str = Query(..., description="Search query"),
+    size: int = Query(10, ge=1, le=50, description="Number of results"),
+    min_score: Optional[float] = Query(None, ge=0, description="Minimum score threshold"),
+    include_stats: bool = Query(False, description="Include document statistics in results")
+) -> SearchResponse:
+    """Perform hybrid search over the content using GET"""
+    request = SearchRequest(q=q, size=size, min_score=min_score, include_stats=include_stats)
+    return await search_post(request)
+
+@app.post("/suggest")
+async def suggest_post(request: SuggestRequest) -> List[str]:
+    """Get search suggestions based on partial input using POST"""
     try:
         es = get_es_client()
         response = es.search(
@@ -129,10 +143,10 @@ async def suggest(
                 "size": 0,
                 "suggest": {
                     "title_suggest": {
-                        "prefix": q,
+                        "prefix": request.q,
                         "completion": {
                             "field": "title",
-                            "size": size,
+                            "size": request.size,
                             "skip_duplicates": True
                         }
                     }
@@ -146,10 +160,55 @@ async def suggest(
             for option in suggestion['options']
         ]
         
-        return suggestions[:size]
+        return suggestions[:request.size]
         
     except Exception as e:
         logger.error(f"Suggestion error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/suggest")
+async def suggest_get(
+    q: str = Query(..., description="Partial query to get suggestions for"),
+    size: int = Query(5, ge=1, le=10, description="Number of suggestions")
+) -> List[str]:
+    """Get search suggestions based on partial input using GET"""
+    request = SuggestRequest(q=q, size=size)
+    return await suggest_post(request)
+
+@app.get("/urls")
+async def list_urls(
+    sort: str = Query("asc", description="Sort direction: asc or desc"),
+    size: int = Query(100, ge=1, le=1000, description="Number of URLs to return"),
+    from_: int = Query(0, ge=0, alias="from", description="Starting offset")
+) -> Dict[str, Any]:
+    """List all document URLs with sorting and pagination"""
+    try:
+        es = get_es_client()
+        response = es.search(
+            index="roc_eclerc_content",
+            body={
+                "_source": ["url", "title"],  # Include title for reference
+                "sort": [
+                    {"url": {"order": sort.lower()}}  # Sort by URL directly since it's a keyword
+                ],
+                "size": size,
+                "from": from_
+            }
+        )
+        
+        return {
+            "total": response["hits"]["total"]["value"],
+            "urls": [
+                {
+                    "url": hit["_source"]["url"],
+                    "title": hit["_source"]["title"]  # Include title for context
+                }
+                for hit in response["hits"]["hits"]
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing URLs: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

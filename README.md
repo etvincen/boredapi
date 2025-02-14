@@ -81,14 +81,17 @@ poetry run playwright install chromium
 ### 3. Running the Pipeline
 
 ```bash
-# 1. Start the services
-docker-compose -f docker/docker-compose.dev.yml up -d
+# 1. Start Elasticsearch and Kibana
+docker-compose -f docker/docker-compose.dev.yml up -d elasticsearch kibana
 
 # 2. Run the crawler
 poetry run python -m src.cli.crawler_cli
 
 # 3. Ingest data into Elasticsearch
 poetry run python -m src.cli.ingest_data
+
+# 4. Start the API service locally
+poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 4. Verify Installation

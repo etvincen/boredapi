@@ -41,6 +41,8 @@ class ContentfulSettings(BaseModel):
     ENVIRONMENT: str = "master"
 
 class Settings(BaseSettings):
+    PROJECT_NAME: str = "Roc Eclerc Search API"
+    API_V1_STR: str = "/api/v1"
     api: APISettings = APISettings()
     crawler: CrawlerSettings = CrawlerSettings()
     elasticsearch: ElasticsearchSettings = ElasticsearchSettings()

@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
+# Import the app instance from main.py
+from src.api.main import app
 
 def create_application() -> FastAPI:
     app = FastAPI(
