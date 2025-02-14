@@ -29,6 +29,7 @@ python-logstash = "^0.4.8"
 spacy = "^3.8.4"
 scikit-learn = "^1.6.1"
 numpy = "^2.2.2"
+sentence-transformers = "^3.4.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
