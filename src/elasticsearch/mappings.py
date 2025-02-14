@@ -30,6 +30,12 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                 "raw_text": {
                     "type": "text"
                 },
+                "text_embedding": {  # Add vector field for SBERT embeddings
+                    "type": "dense_vector",
+                    "dims": 384,  # Dimension for all-MiniLM-L6-v2
+                    "similarity": "cosine",
+                    "index": True  # Enable vector search
+                },
                 "preprocessed_keywords": {
                     "type": "text",
                     "analyzer": "french_exact",

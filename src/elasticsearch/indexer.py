@@ -7,6 +7,7 @@ from .mappings import get_index_settings, get_index_name
 import time
 from tqdm import tqdm
 from ..nlp.preprocessor import TextPreprocessor
+from ..nlp.embeddings import EmbeddingsGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class ContentIndexer:
         self.index_name = get_index_name()
         self.batch_size = 10  # Add batch size as instance variable
         self.preprocessor = TextPreprocessor()
+        self.embeddings_generator = EmbeddingsGenerator()  # Add embeddings generator
         
     def create_index(self, force_recreate: bool = False) -> None:
         """Create the Elasticsearch index with proper mappings
@@ -116,22 +118,37 @@ class ContentIndexer:
         preprocessed_keywords = ' '.join(token for token in preprocessed['lemmatized_tokens'] if token.strip())
         
         # Prepare the document with all fields
-        return {
+        prepared_doc = {
             'url': doc.get('url', ''),
             'title': doc.get('title', ''),
             'raw_text': raw_text,
             'preprocessed_keywords': preprocessed_keywords,
-                    'topics': topics,
+            'topics': topics,
             'statistics': {
-                    'word_count': word_count,
+                'word_count': word_count,
                 'sentence_count': sentence_count,
-                    'section_count': section_count,
+                'section_count': section_count,
                 'external_link_count': external_links,
                 'internal_link_count': internal_links,
                 'image_count': image_count,
                 'avg_words_per_sentence': round(avg_words_per_sentence, 2)
             }
         }
+        
+        # Generate and add embedding
+        try:
+            embedding = self.embeddings_generator.generate_document_embedding({
+                'title': prepared_doc['title'],
+                'raw_text': prepared_doc['raw_text']
+            })
+            if embedding:
+                prepared_doc['text_embedding'] = embedding
+                logger.debug(f"Generated embedding for document: {prepared_doc['title']}")
+        except Exception as e:
+            logger.error(f"Error generating embedding for document: {str(e)}")
+            # If embedding fails, we'll still index the document without it
+            
+        return prepared_doc
         
     def generate_bulk_actions(self, pages: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
         """Generate actions for bulk indexing"""

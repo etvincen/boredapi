@@ -6,7 +6,9 @@ from tqdm import tqdm
 import json
 import glob
 import os
+from elasticsearch import Elasticsearch
 from src.nlp.embeddings import EmbeddingsGenerator
+from src.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,19 +47,15 @@ class EmbeddingsMonitor:
         """
         start_time = time.time()
         
-        # Extract text from sections
-        content = self.extract_text_from_sections(doc.get('sections', []))
-        doc_with_text = {
-            'title': doc.get('title', ''),
-            'raw_text': content
-        }
+        # Get content directly from raw_text
+        content = doc.get('raw_text', '')
         
         # Get chunks before embedding
         chunks = self.embeddings_generator.chunk_text(content)
         
         # Generate embedding with timing
         chunk_start = time.time()
-        embedding = self.embeddings_generator.generate_document_embedding(doc_with_text)
+        embedding = self.embeddings_generator.generate_document_embedding(doc)
         end_time = time.time()
         
         return {
@@ -180,42 +178,112 @@ def test_real_documents(num_docs: int = 5):
         logger.error(f"Error processing real documents: {str(e)}")
         raise
 
+def test_elasticsearch_documents(num_docs: int = 5):
+    """Test embedding generation with documents from Elasticsearch
+    
+    Args:
+        num_docs: Number of documents to test (default: 5)
+    """
+    # Initialize Elasticsearch client
+    es = Elasticsearch([
+        {
+            'host': settings.elasticsearch.HOST,
+            'port': settings.elasticsearch.PORT,
+            'scheme': 'https' if settings.elasticsearch.USE_SSL else 'http'
+        }
+    ], basic_auth=(
+        settings.elasticsearch.USERNAME,
+        settings.elasticsearch.PASSWORD
+    ) if settings.elasticsearch.USERNAME else None)
+    
+    try:
+        # Get sample documents from Elasticsearch
+        response = es.search(
+            index="roc_eclerc_content",
+            body={
+                "size": num_docs,
+                "query": {"match_all": {}},
+                "_source": ["title", "raw_text", "statistics"]  # Only fetch needed fields
+            }
+        )
+        
+        docs = []
+        for hit in response['hits']['hits']:
+            source = hit['_source']
+            # Create document in the format expected by EmbeddingsGenerator
+            doc = {
+                'title': source['title'],
+                'raw_text': source['raw_text'],  # Use raw_text directly
+                'stats': source.get('statistics', {})
+            }
+            docs.append(doc)
+            
+        if not docs:
+            logger.error("No documents found in Elasticsearch!")
+            return
+            
+        logger.info(f"Testing with {len(docs)} documents from Elasticsearch")
+        
+        # Initialize monitor and run tests
+        monitor = EmbeddingsMonitor()
+        
+        # Test batch processing
+        logger.info("\nTesting Elasticsearch document processing:")
+        batch_result = monitor.test_batch(docs, sample_size=num_docs)
+        
+        # Print detailed results with additional stats
+        logger.info("\nDetailed Results:")
+        logger.info("-" * 50)
+        for detail in batch_result['sample_details']:
+            doc_stats = next((d['stats'] for d in docs if d['title'] == detail['title']), {})
+            
+            logger.info(f"\nDocument: {detail['title']}")
+            logger.info(f"Processing time: {detail['metrics']['total_time_seconds']:.3f}s")
+            logger.info(f"Number of chunks: {detail['metrics']['num_chunks']}")
+            logger.info(f"Content length: {detail['metrics']['content_length']} characters")
+            logger.info(f"Original stats from ES:")
+            logger.info(f"  - Word count: {doc_stats.get('word_count', 'N/A')}")
+            logger.info(f"  - Sentence count: {doc_stats.get('sentence_count', 'N/A')}")
+            if detail['metrics']['chunks_preview']:
+                logger.info("First chunk preview:")
+                for i, chunk in enumerate(detail['metrics']['chunks_preview']):
+                    logger.info(f"Chunk {i+1}: {chunk}")
+            
+            # Add embedding stats
+            logger.info("Embedding stats:")
+            logger.info(f"  - Dimension: {detail['metrics']['embedding_dimension']}")
+            logger.info(f"  - Mean: {detail['metrics']['embedding_stats']['mean']}")
+            logger.info(f"  - Std: {detail['metrics']['embedding_stats']['std']}")
+                
+        logger.info("\nAggregate Statistics:")
+        logger.info("-" * 50)
+        logger.info(f"Average time per document: {batch_result['avg_time_per_doc']:.3f}s")
+        logger.info(f"Average chunks per document: {batch_result['avg_chunks_per_doc']:.2f}")
+        logger.info(f"Embedding time stats: {batch_result['embedding_time_stats']}")
+        
+        # Suggest next steps
+        logger.info("\nNext Steps:")
+        logger.info("-" * 50)
+        logger.info("1. Update Elasticsearch mappings to add vector field:")
+        logger.info("   - Add dense_vector field with 384 dimensions")
+        logger.info("   - Configure for cosine similarity")
+        logger.info("2. Modify indexing pipeline to include embeddings")
+        logger.info("3. Re-index content with embeddings")
+        logger.info("4. Test hybrid search functionality")
+        
+    except Exception as e:
+        logger.error(f"Error processing Elasticsearch documents: {str(e)}")
+        raise
+
 def main():
     """Run embedding tests"""
-    # Comment out sample document tests
+    # Comment out previous tests
     '''
-    # Create sample documents
-    sample_docs = [
-        {
-            'title': 'Short Document',
-            'raw_text': 'This is a very short document. It should be processed quickly.'
-        },
-        {
-            'title': 'Medium Document',
-            'raw_text': ' '.join(['This is sentence number {}.'.format(i) for i in range(50)])
-        },
-        {
-            'title': 'Long Document',
-            'raw_text': ' '.join(['This is sentence number {}.'.format(i) for i in range(200)])
-        }
-    ]
-    
-    # Run tests
-    monitor = EmbeddingsMonitor()
-    
-    # Test single document
-    logger.info("\nTesting single document processing:")
-    single_result = monitor.test_single_document(sample_docs[1])  # Test medium doc
-    logger.info(f"Single document results:\n{single_result}")
-    
-    # Test batch processing
-    logger.info("\nTesting batch processing:")
-    batch_result = monitor.test_batch(sample_docs)
-    logger.info(f"Batch processing results:\n{batch_result}")
+    # ... previous test code stays commented ...
     '''
     
-    # Test with real documents instead
-    test_real_documents(num_docs=5)
+    # Test with Elasticsearch documents instead
+    test_elasticsearch_documents(num_docs=5)
     
 if __name__ == '__main__':
     main()
