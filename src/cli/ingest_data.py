@@ -102,10 +102,10 @@ def main():
         crawl_data = load_crawl_results(latest_crawl)
         
         # Take only 40 documents
-        #crawl_data['results'] = crawl_data['results'][:40]
+        crawl_data['results'] = crawl_data['results'][:40]
 
         # Take all documents
-        crawl_data['results'] = crawl_data['results']
+        # crawl_data['results'] = crawl_data['results']
         print(f"\nSelected {len(crawl_data['results'])} documents for processing")
         
         # Transform content
@@ -118,22 +118,14 @@ def main():
         print("\n2. Running NLP Processing")
         nlp_processor = NLPProcessor()
         
-        # Process all pages with progress bar
+        # First, process all documents at once to fit the topic model
         pages = transformed_data['pages']
-        processed_docs = []
-        
-        for page in tqdm(pages, desc="Processing documents", unit="doc"):
-            try:
-                processed_doc, _ = nlp_processor.process_documents([page])
-                if processed_doc:
-                    processed_docs.extend(processed_doc)
-            except Exception as e:
-                logger.error(f"Error processing document {page.get('url', 'unknown')}: {str(e)}")
-        
-        # Calculate corpus stats at the end
-        _, corpus_stats = nlp_processor.process_documents(pages)  # Use all pages for corpus stats
-        
-        print(f"\nSuccessfully processed {len(processed_docs)} documents")
+        try:
+            processed_docs, corpus_stats = nlp_processor.process_documents(pages)
+            print(f"\nSuccessfully processed {len(processed_docs)} documents")
+        except Exception as e:
+            logger.error(f"Error during NLP processing: {str(e)}")
+            raise
         
         # Save results
         print("\n3. Saving Transformed Results")

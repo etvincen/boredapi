@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 import logging
+from .topic_modeling import TopicModeler
 from .keyword_extraction import KeywordExtractor
 
 logger = logging.getLogger(__name__)
@@ -7,26 +8,37 @@ logger = logging.getLogger(__name__)
 class NLPProcessor:
     def __init__(self):
         """Initialize NLP components"""
+        self.topic_modeler = TopicModeler(n_topics=3, max_features=1000)
         self.keyword_extractor = KeywordExtractor(min_frequency=2, max_keywords=50)
+        self.is_fitted = False
         
     def process_documents(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process a list of documents with essential NLP components"""
         try:
-            # Process each document
+            # First, fit models on the entire corpus if not already fitted
+            if not self.is_fitted:
+                logger.info("Fitting NLP models on corpus...")
+                try:
+                    # Fit topic model
+                    self.topic_modeler.fit(documents)
+                    # Fit keyword extractor
+                    self.keyword_extractor.fit(documents)
+                    self.is_fitted = True
+                    logger.info("NLP models fitted successfully")
+                except Exception as e:
+                    logger.error(f"Error fitting NLP models: {str(e)}")
+                    raise
+            
+            # Then process each document
             processed_documents = []
             for doc in documents:
                 try:
-                    # Simulate topic features for now
-                    topic_features = {
-                        'topic_distribution': [
-                            {
-                                'topic_id': 0,
-                                'name': 'Services Funéraires',
-                                'probability': 0.8,
-                                'terms': [{'term': 'obsèques', 'weight': 0.5}]
-                            }
-                        ]
-                    }
+                    # Extract topics using the fitted model
+                    try:
+                        topic_features = self.topic_modeler.transform_document(doc)
+                    except Exception as e:
+                        logger.error(f"Error in topic extraction for {doc.get('url', 'unknown')}: {str(e)}")
+                        topic_features = {'topic_distribution': []}
                     
                     # Extract keywords and entities
                     try:
@@ -58,9 +70,9 @@ class NLPProcessor:
             
             # Get corpus-level keyword statistics
             try:
-                corpus_keywords = self.keyword_extractor.extract_corpus_keywords(documents)
+                corpus_keywords = self.keyword_extractor.get_corpus_keywords()
             except Exception as e:
-                logger.error(f"Error calculating corpus statistics: {str(e)}")
+                logger.error(f"Error getting corpus statistics: {str(e)}")
                 corpus_keywords = {}
             
             return processed_documents, corpus_keywords

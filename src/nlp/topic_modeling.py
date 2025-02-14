@@ -17,7 +17,8 @@ class TopicModeler:
         # Initialize but don't fit yet
         self.vectorizer = CountVectorizer(
             max_features=max_features,
-            stop_words=None  # We'll use spaCy's preprocessing
+            stop_words=None,  # We'll use spaCy's preprocessing
+            min_df=2  # Require terms to appear in at least 2 documents
         )
         
         self.lda = LatentDirichletAllocation(
@@ -28,6 +29,8 @@ class TopicModeler:
         
         self.is_fitted = False
         self.topic_labels = {}  # Store assigned labels
+        
+        logger.info(f"Initialized TopicModeler with {n_topics} topics and {max_features} max features")
         
         # Predefined topic categories with their related terms in French
         self.topic_categories = {
@@ -42,32 +45,69 @@ class TopicModeler:
         """Prepare texts for topic modeling using preprocessor"""
         processed_texts = []
         
-        for doc in documents:
+        for i, doc in enumerate(documents):
             # Process document
-            nlp_features = self.preprocessor.process_document(doc)
-            # Join lemmatized tokens
-            processed_texts.append(' '.join(nlp_features['lemmatized_tokens']))
+            try:
+                nlp_features = self.preprocessor.process_document(doc)
+                tokens = nlp_features['lemmatized_tokens']
+                
+                logger.debug(f"Document {i}: Found {len(tokens)} tokens")
+                if len(tokens) < 5:  # Log warning if very few tokens
+                    logger.warning(f"Document {i} ({doc.get('url', 'unknown')}) has very few tokens: {tokens}")
+                
+                if tokens:  # Only add if we have tokens
+                    processed_text = ' '.join(tokens)
+                    logger.debug(f"Document {i}: Processed text length: {len(processed_text)}")
+                    processed_texts.append(processed_text)
+                else:
+                    logger.warning(f"Document {i} ({doc.get('url', 'unknown')}) produced no tokens")
+            except Exception as e:
+                logger.error(f"Error processing document {i} ({doc.get('url', 'unknown')}): {str(e)}")
+                continue
+            
+        logger.info(f"Prepared {len(processed_texts)} documents for topic modeling")
+        if not processed_texts:
+            raise ValueError("No valid texts to process after preparation")
             
         return processed_texts
         
     def fit(self, documents: List[Dict[str, Any]]) -> None:
         """Fit the topic model on a corpus of documents"""
-        logger.info("Preparing texts for topic modeling...")
-        processed_texts = self._prepare_texts(documents)
+        if not documents:
+            raise ValueError("No documents provided for fitting")
+            
+        logger.info(f"Starting topic modeling on {len(documents)} documents")
         
-        logger.info("Creating document-term matrix...")
-        self.dtm = self.vectorizer.fit_transform(processed_texts)
-        
-        logger.info("Fitting LDA model...")
-        self.lda.fit(self.dtm)
-        
-        self.feature_names = self.vectorizer.get_feature_names_out()
-        self.is_fitted = True  # Set fitted flag before getting terms
-        
-        # Assign topic labels after fitting
-        self._assign_topic_labels()
-        
-        logger.info("Topic model fitted successfully")
+        try:
+            logger.info("Preparing texts for topic modeling...")
+            processed_texts = self._prepare_texts(documents)
+            
+            logger.info("Creating document-term matrix...")
+            self.dtm = self.vectorizer.fit_transform(processed_texts)
+            
+            # Log vocabulary stats
+            vocab = self.vectorizer.get_feature_names_out()
+            logger.info(f"Vocabulary size: {len(vocab)}")
+            logger.debug(f"Sample vocabulary terms: {list(vocab[:20])}")
+            
+            logger.info(f"Document-term matrix shape: {self.dtm.shape}")
+            if self.dtm.shape[1] == 0:
+                raise ValueError("Empty vocabulary in document-term matrix")
+            
+            logger.info("Fitting LDA model...")
+            self.lda.fit(self.dtm)
+            
+            self.feature_names = vocab
+            self.is_fitted = True
+            
+            # Assign topic labels after fitting
+            self._assign_topic_labels()
+            
+            logger.info("Topic model fitted successfully")
+            
+        except Exception as e:
+            logger.error(f"Error during topic modeling: {str(e)}")
+            raise
         
     def _assign_topic_labels(self) -> None:
         """Assign unique labels to topics based on their terms"""
