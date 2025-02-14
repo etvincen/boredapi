@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from elasticsearch import Elasticsearch
 from typing import List, Optional, Dict, Any
 import logging
 from pydantic import BaseModel
 from src.config import settings
 from src.api.services.search import SearchService
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +30,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/")
+async def root():
+    """Serve the search UI"""
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 # Request/Response models
 class SearchRequest(BaseModel):

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roc Eclerc Search</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .search-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .result-item {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            transition: all 0.2s ease;
+        }
+        .result-item:hover {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+        }
+        .score-badge {
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+        .preview-text {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        #searchInput {
+            border-radius: 25px 0 0 25px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        #searchButton {
+            border-radius: 0 25px 25px 0;
+            padding-left: 25px;
+            padding-right: 25px;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container search-container">
+        <h1 class="text-center mb-4">Roc Eclerc Search</h1>
+        
+        <div class="row justify-content-center">
+            <div class="col-12">
+                <form id="searchForm" class="mb-3" onsubmit="return false;">
+                    <div class="input-group">
+                        <input type="text" 
+                               id="searchInput" 
+                               class="form-control form-control-lg" 
+                               placeholder="Rechercher..."
+                               aria-label="Search query">
+                        <button class="btn btn-primary btn-lg" 
+                                type="submit" 
+                                id="searchButton">
+                            Rechercher
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="loading text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <div id="results" class="mt-4"></div>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('searchForm');
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.querySelector('.loading');
+        let searchTimeout;
+
+        async function performSearch(query) {
+            if (!query.trim()) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+
+            loadingDiv.style.display = 'block';
+            searchButton.disabled = true;
+            
+            try {
+                const response = await fetch(`/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        q: query,
+                        size: 5
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.results && data.results.length > 0) {
+                    resultsDiv.innerHTML = data.results
+                        .map(result => `
+                            <div class="result-item">
+                                <a href="${result.url}" target="_blank" class="text-decoration-none">
+                                    <h5 class="mb-1">${result.title}</h5>
+                                </a>
+                                <span class="score-badge">Score: ${result.score.toFixed(2)}</span>
+                                <p class="preview-text">${result.text_preview}</p>
+                            </div>
+                        `)
+                        .join('');
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-info" role="alert">
+                            Aucun résultat trouvé pour "${query}"
+                        </div>`;
+                }
+                    
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        Une erreur s'est produite lors de la recherche.
+                    </div>`;
+            } finally {
+                loadingDiv.style.display = 'none';
+                searchButton.disabled = false;
+            }
+        }
+
+        // Handle form submission
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            clearTimeout(searchTimeout);
+            performSearch(searchInput.value);
+        });
+
+        // Handle button click
+        searchButton.addEventListener('click', () => {
+            clearTimeout(searchTimeout);
+            performSearch(searchInput.value);
+        });
+
+        // Debounced search on input (optional - you can remove this if you want search only on button click)
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performSearch(e.target.value);
+            }, 500); // Increased debounce time to 500ms
+        });
+
+        // Search on Enter key
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(searchTimeout);
+                performSearch(searchInput.value);
+            }
+        });
+    </script>
+</body>
+</html>

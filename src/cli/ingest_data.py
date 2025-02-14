@@ -102,7 +102,10 @@ def main():
         crawl_data = load_crawl_results(latest_crawl)
         
         # Take only 40 documents
-        crawl_data['results'] = crawl_data['results'][:40]
+        #crawl_data['results'] = crawl_data['results'][:40]
+
+        # Take all documents
+        crawl_data['results'] = crawl_data['results']
         print(f"\nSelected {len(crawl_data['results'])} documents for processing")
         
         # Transform content
