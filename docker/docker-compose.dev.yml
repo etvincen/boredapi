@@ -24,7 +24,7 @@ services:
       - xpack.security.http.ssl.enabled=false
       - xpack.security.authc.token.enabled=true
       - ELASTIC_PASSWORD=elastic123
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ES_JAVA_OPTS=-Xms400m -Xmx400m"
     volumes:
       - ${DEV_DATA_PATH:-../data}/elasticsearch:/usr/share/elasticsearch/data
       - ./setup-users.sh:/setup-users.sh:ro
@@ -38,6 +38,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+        reservations:
+          memory: 400M
     command: >
       bash -c "
         # Start Elasticsearch
@@ -57,13 +63,41 @@ services:
         wait $ES_PID
       "
 
+  search_api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_PASSWORD=elastic123
+      - ELASTICSEARCH_USE_SSL=false
+    ports:
+      - "8000:8000"
+    networks:
+      - elastic
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Enough for FastAPI + SBERT model
+        reservations:
+          memory: 384M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     depends_on:
       elasticsearch:
         condition: service_healthy
     environment:
-      - NODE_OPTIONS="--max-old-space-size=512"
+      - NODE_OPTIONS="--max-old-space-size=384"
       - LOGGING_ROOT_LEVEL=info
       - LOGGING_VERBOSE=true
     volumes:
@@ -74,6 +108,12 @@ services:
       - "5601:5601"
     networks:
       - elastic
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 384M
     healthcheck:
       test: ["CMD-SHELL", "curl -s -I http://localhost:5601/api/status | grep -q 'HTTP/1.1 200 OK'"]
       interval: 30s

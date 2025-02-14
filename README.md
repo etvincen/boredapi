@@ -1,218 +1,172 @@
-# Web Content Migration System
+# Roc Eclerc Content Pipeline
 
-A robust web scraping and content migration system that automatically crawls websites and migrates content to Contentful CMS, with built-in storage limits and monitoring.
+A complete pipeline for crawling, processing, indexing, and searching content with semantic capabilities.
 
-## Overview
+## Architecture Overview
 
-This system provides:
-- Automated web content scraping (with 1GB storage limit)
-- Content migration to Contentful CMS
-- Search capabilities via Elasticsearch
-- Progress tracking in PostgreSQL
-- Monitoring with Prometheus metrics
-
-## Environment Setup
-
-The system supports two environments:
-
-### Development Environment (default)
-- Python code runs locally through Poetry
-- Databases (Elasticsearch, PostgreSQL) run in containers
-- Hot-reloading enabled for faster development
-- Access databases directly on localhost ports
-
-```bash
-# Start development databases
-./scripts/manage.sh start
-
-# Run crawler locally
-./scripts/manage.sh crawler
-
-# Ingest data to databases
-./scripts/manage.sh ingest
+```
+Playwright Crawler → Content Processor → Elasticsearch + Embeddings → FastAPI Search Service
 ```
 
-### Production Environment
-- All components run in containers
-- Proper service orchestration
-- Automatic health checks
-- Internal container networking
+## Features
+
+### 1. Content Crawling
+- JavaScript-rendered content support via Playwright
+- Structured content extraction (sections, subsections)
+- Media and link tracking
+- Rate limiting and robots.txt compliance
+
+### 2. Content Processing
+- Text extraction and cleaning
+- Section hierarchy preservation
+- Statistics generation:
+  * Word and sentence counts
+  * Internal/external link counts
+  * Media asset tracking
+  * Section structure analysis
+
+### 3. Intelligent Indexing
+- Hybrid storage with Elasticsearch
+- Vector embeddings (SBERT all-MiniLM-L6-v2)
+- Text chunking for optimal embedding
+- Content statistics and metadata
+- Automatic backup/restore capabilities
+
+### 4. Semantic Search API
+- Hybrid search combining:
+  * BM25 text similarity
+  * Vector similarity (cosine)
+  * Smart result ranking
+- Auto-suggestions
+- Performance metrics
+- OpenAPI documentation
+
+## Prerequisites
+- Python 3.12+
+- Docker and Docker Compose
+- ~1GB free memory
+- Poetry for dependency management
+
+## Quick Start Guide
+
+### 1. Clone and Setup
 
 ```bash
-# Start production environment
-ENV=prod ./scripts/manage.sh start
+# Clone the repository
+git clone https://github.com/etvincen/boredapi
+cd boredapi
 
-# Run crawler in container
-ENV=prod ./scripts/manage.sh crawler
-
-# Ingest data in container
-ENV=prod ./scripts/manage.sh ingest
+# Configure environment
+cp .env.example .env
+# Edit .env with your settings
 ```
 
-## Quick Start
+### 2. Poetry Setup
 
-1. Clone the repository:
-    git clone <repository-url>
-    cd web-migration-system
-
-2. Configure environment:
-    cp .env.example .env
-    Edit .env with your values:
-     - TARGET_DOMAIN: Website to scrape
-     - CONTENTFUL credentials
-     - Database settings
-
-3. Choose your environment:
-   - For development (default): ./scripts/manage.sh start
-   - For production: ENV=prod ./scripts/manage.sh start
-
-## Key Features
-
-- **Smart Scraping**:
-  - Concurrent scraping with configurable workers
-  - Automatic content type detection
-  - Storage limit monitoring (1GB max)
-  - Rate limiting and retry mechanisms
-
-- **Content Processing**:
-  - Structured content extraction
-  - Media asset handling
-  - Metadata collection
-  - Content hierarchy preservation
-
-- **Storage & Search**:
-  - Elasticsearch for content storage and search
-  - PostgreSQL for migration tracking
-  - Automatic cleanup when approaching storage limits
-
-- **Monitoring**:
-  - Real-time progress tracking
-  - Storage usage alerts
-  - Service health monitoring
-  - Prometheus metrics integration
-
-## Development Workflow
-
-1. Start development environment:
 ```bash
-./scripts/manage.sh start  # Starts Elasticsearch and PostgreSQL containers
+# Configure Poetry
+poetry config virtualenvs.path
+poetry config virtualenvs.in-project true
+
+# Install dependencies and generate lock file
+poetry install
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Install Playwright browser
+poetry run playwright install chromium
 ```
 
-2. Run crawler locally:
+### 3. Running the Pipeline
+
 ```bash
-./scripts/manage.sh crawler  # Uses local Python with Poetry
+# 1. Start the services
+docker-compose -f docker/docker-compose.dev.yml up -d
+
+# 2. Run the crawler
+poetry run python -m src.cli.crawler_cli
+
+# 3. Ingest data into Elasticsearch
+poetry run python -m src.cli.ingest_data
 ```
 
-3. Ingest data:
+### 4. Verify Installation
+
+- Check Elasticsearch: http://localhost:9200
+- Check Kibana: http://localhost:5601
+- Check API docs: http://localhost:8000/docs
+
+### 5. Search API
+The API runs at http://localhost:8000 with these endpoints:
+
+#### Search
 ```bash
-./scripts/manage.sh ingest  # Processes latest results into databases
+curl "http://localhost:8000/search?q=Comment%20pr%C3%A9parer%20ses%20obs%C3%A8ques&size=3"
 ```
+Parameters:
+- `q`: Search query (required)
+- `size`: Number of results (default: 10)
+- `min_score`: Minimum score threshold
+- `include_stats`: Include document statistics
 
-4. View logs:
+#### Suggestions
 ```bash
-./scripts/manage.sh logs
+curl "http://localhost:8000/suggest?q=obs&size=5"
 ```
 
-## Production Workflow
+#### Documentation
+- OpenAPI docs: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
-1. Start production environment:
+## Performance
+
+### Resource Usage
+- Elasticsearch: 400MB memory
+- Search API: 384MB memory
+- Kibana: 384MB memory
+
+### Processing Speed
+- Crawling: ~1-2 pages/second
+- Indexing: ~5-10 documents/second
+- Search latency: ~200-500ms
+
+### Capacity
+- Tested with:
+  * ~40 pages
+  * ~5000-8000 words per page
+  * ~200KB average document size
+
+## Development
+
+### Testing
 ```bash
-ENV=prod ./scripts/manage.sh start  # Starts all containers
+# Test embeddings
+poetry run python src/nlp/test_embeddings.py
+
+# Test search
+poetry run python src/nlp/test_vector_search.py
 ```
 
-2. Run crawler in container:
-```bash
-ENV=prod ./scripts/manage.sh crawler
-```
+### Monitoring
+- Elasticsearch: http://localhost:9200
+- Kibana: http://localhost:5601
 
-3. Ingest data:
-```bash
-ENV=prod ./scripts/manage.sh ingest
-```
+## Limitations
 
-4. Monitor:
-```bash
-ENV=prod ./scripts/manage.sh logs
-```
+Current known limitations:
+1. Single-node Elasticsearch (development setup)
+2. Limited to ~5 chunks per document for embeddings
+3. Basic auto-suggestions (title-based only)
+4. No authentication on the search API
+5. Memory-optimized for small-medium content sets
 
-## Environment Differences
+## Future Improvements
 
-Development:
-- Local Python execution (faster development)
-- Direct database access (localhost:5432, localhost:9200)
-- Development volume mounts
-- Hot-reloading enabled
-
-Production:
-- Fully containerized
-- Internal container networking
-- Production volume mounts
-- Health checks enforced
-
-## API Endpoints
-
-- GET /api/v1/content/search - Search content
-- GET /api/v1/content/{id} - Get specific content
-- POST /api/v1/migration/start - Start migration
-- GET /api/v1/migration/status - Get migration status
-- GET /api/v1/health - Service health check
-
-## Configuration
-
-Key environment variables:
-
-# Scraping
-TARGET_DOMAIN=https://example.com
-MAX_CONCURRENT_SCRAPES=5
-SCRAPING_DELAY=1.0
-
-# Contentful
-CONTENTFUL_SPACE_ID=your-space-id
-CONTENTFUL_ACCESS_TOKEN=your-token
-CONTENTFUL_ENVIRONMENT=master
-
-# Storage
-POSTGRES_SERVER=localhost  # (dev) or db (prod)
-ELASTICSEARCH_HOST=localhost  # (dev) or elasticsearch (prod)
-
-## Project Structure
-
-web_migration_system/
-├── docker/          # Docker configuration
-│   ├── docker-compose.dev.yml   # Development setup
-│   └── docker-compose.prod.yml  # Production setup
-├── scripts/         # Management scripts
-├── src/
-│   ├── api/        # FastAPI application
-│   ├── cli/        # Command-line tools
-│   ├── scraper/    # Web scraping logic
-│   ├── storage/    # Database clients
-│   ├── contentful/ # CMS integration
-│   └── monitoring/ # Metrics collection
-└── tests/          # Test suites
-
-## Monitoring & Alerts
-
-The system monitors:
-- Storage usage (warns at 80%, stops at 100% of 1GB)
-- Service health
-- Migration progress
-- Error rates
-- Processing times
-
-## Dependencies
-
-- Python 3.12
-- PostgreSQL 15
-- Elasticsearch 8.11
-- Playwright (for web scraping)
-- FastAPI (for API layer)
-- Poetry (for dependency management)
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: ./scripts/manage.sh test
-5. Submit a pull request
+Potential enhancements:
+1. Multi-node Elasticsearch setup
+2. Advanced query understanding
+3. Search result highlighting
+4. User feedback integration
+5. Authentication and rate limiting
+6. Content type facets and filters
