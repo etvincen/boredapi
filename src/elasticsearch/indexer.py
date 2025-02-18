@@ -6,8 +6,6 @@ from datetime import datetime
 from .mappings import get_index_settings, get_index_name
 import time
 from tqdm import tqdm
-from ..nlp.preprocessor import TextPreprocessor
-from ..nlp.embeddings import EmbeddingsGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +13,7 @@ class ContentIndexer:
     def __init__(self, es_client: Elasticsearch):
         self.es = es_client
         self.index_name = get_index_name()
-        self.batch_size = 10  # Add batch size as instance variable
-        self.preprocessor = TextPreprocessor()
-        self.embeddings_generator = EmbeddingsGenerator()  # Add embeddings generator
+        self.batch_size = 10
         
     def create_index(self, force_recreate: bool = False) -> None:
         """Create the Elasticsearch index with proper mappings
@@ -52,108 +48,10 @@ class ContentIndexer:
         except Exception as e:
             logger.error(f"Error creating index: {str(e)}")
             raise
-        
-    def prepare_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare a document for indexing with all required fields and statistics"""
-        # Extract topics from NLP features
-        topics = []
-        if 'nlp_features' in doc and 'topics' in doc['nlp_features']:
-            for topic in doc['nlp_features']['topics']:
-                topics.append({
-                    'name': topic['name'],
-                    'probability': round(topic['probability'], 3)  # Round to 3 decimal places
-                })
-        
-        # Collect all text and calculate statistics
-        all_text = []
-        section_count = 0
-        internal_links = 0
-        external_links = 0
-        image_count = 0
-        
-        def process_section(section: Dict[str, Any]) -> None:
-            """Process a section and its subsections recursively"""
-            nonlocal section_count, internal_links, external_links, image_count
             
-            section_count += 1
-            
-            if section.get('title'):
-                all_text.append(section['title'].strip())
-            
-            if section.get('text'):
-                all_text.append(section['text'].strip())
-            
-            # Count links from the section
-            for link in section.get('links', []):
-                if link.get('is_internal', False):
-                    internal_links += 1
-                else:
-                    external_links += 1
-            
-            # Count images
-            if 'images' in section:
-                image_count += len(section['images'])
-            
-            # Process subsections recursively
-            for subsection in section.get('subsections', []):
-                process_section(subsection)
-        
-        # Process all sections
-        for section in doc.get('sections', []):
-            process_section(section)
-        
-        # Combine all text with proper spacing
-        raw_text = ' '.join(text for text in all_text if text)
-        
-        # Calculate text statistics
-        sentences = [s.strip() for s in raw_text.split('.') if s.strip()]
-        sentence_count = len(sentences)
-        words = [w for w in raw_text.split() if w.strip()]  # Filter out empty strings
-        word_count = len(words)
-        avg_words_per_sentence = word_count / sentence_count if sentence_count > 0 else 0
-        
-        # Get preprocessed keywords using TextPreprocessor
-        preprocessed = self.preprocessor.process_document(doc)
-        # Join tokens with proper spacing and ensure no empty tokens
-        preprocessed_keywords = ' '.join(token for token in preprocessed['lemmatized_tokens'] if token.strip())
-        
-        # Prepare the document with all fields
-        prepared_doc = {
-            'url': doc.get('url', ''),
-            'title': doc.get('title', ''),
-            'raw_text': raw_text,
-            'preprocessed_keywords': preprocessed_keywords,
-            'topics': topics,
-            'statistics': {
-                'word_count': word_count,
-                'sentence_count': sentence_count,
-                'section_count': section_count,
-                'external_link_count': external_links,
-                'internal_link_count': internal_links,
-                'image_count': image_count,
-                'avg_words_per_sentence': round(avg_words_per_sentence, 2)
-            }
-        }
-        
-        # Generate and add embedding
-        try:
-            embedding = self.embeddings_generator.generate_document_embedding({
-                'title': prepared_doc['title'],
-                'raw_text': prepared_doc['raw_text']
-            })
-            if embedding:
-                prepared_doc['text_embedding'] = embedding
-                logger.debug(f"Generated embedding for document: {prepared_doc['title']}")
-        except Exception as e:
-            logger.error(f"Error generating embedding for document: {str(e)}")
-            # If embedding fails, we'll still index the document without it
-            
-        return prepared_doc
-        
-    def generate_bulk_actions(self, pages: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
+    def generate_bulk_actions(self, documents: List[Dict[str, Any]]) -> Generator[Dict[str, Any], None, None]:
         """Generate actions for bulk indexing"""
-        for page in pages:
-            doc = self.prepare_document(page)
+        for doc in documents:
             yield {
                 "_index": self.index_name,
                 "_id": doc['url'],  # Use URL as document ID
@@ -173,10 +71,9 @@ class ContentIndexer:
             operations = []
             for doc in documents:
                 try:
-                    prepared_doc = self.prepare_document(doc)
                     # Each operation needs both the action and source lines
-                    operations.append({"index": {"_index": self.index_name, "_id": prepared_doc['url']}})
-                    operations.append(prepared_doc)
+                    operations.append({"index": {"_index": self.index_name, "_id": doc['url']}})
+                    operations.append(doc)
                 except Exception as e:
                     logger.error(f"Error preparing document for indexing: {str(e)}")
             
@@ -231,6 +128,6 @@ class ContentIndexer:
         doc_count = self.es.count(index=self.index_name)
             
         return {
-        'doc_count': doc_count['count'],
-        'store_size': stats['indices'][self.index_name]['total']['store']['size_in_bytes']
+            'doc_count': doc_count['count'],
+            'store_size': stats['indices'][self.index_name]['total']['store']['size_in_bytes']
         }

@@ -5,6 +5,7 @@ from collections import Counter
 import logging
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class TextPreprocessor:
     def __init__(self):
@@ -33,6 +34,8 @@ class TextPreprocessor:
         # Add custom stop words to spaCy
         for word in self.custom_stop_words:
             self.nlp.vocab[word].is_stop = True
+            
+        logger.info(f"Initialized TextPreprocessor with {len(self.custom_stop_words)} custom stop words")
     
     def clean_text(self, text: str) -> str:
         """Basic text cleaning"""
@@ -40,11 +43,13 @@ class TextPreprocessor:
         text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
         # Remove email addresses
         text = re.sub(r'\S+@\S+', '', text)
-        # Fix spaces before cleaning up whitespace (handle cases like "textAtext" -> "text A text")
+        # Remove numbers (including those with decimal points)
+        text = re.sub(r'\b\d+(?:\.\d+)?\b', '', text)
+        # Fix spaces before cleaning up whitespace
         text = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', text)
-        # Remove extra whitespace and normalize spaces
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
+        # Normalize all types of whitespace (including newlines) to single spaces
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
     
     def process_text(self, text: str) -> spacy.tokens.Doc:
         """Process text with spaCy"""
@@ -56,7 +61,7 @@ class TextPreprocessor:
         return [
             token.lemma_.lower() for token in doc
             if not token.is_stop and not token.is_punct and not token.is_space
-            and len(token.lemma_) > 1  # Filter out single characters
+            and len(token.lemma_) > 1
         ]
     
     def get_named_entities(self, doc: spacy.tokens.Doc) -> List[Dict[str, str]]:
@@ -64,29 +69,19 @@ class TextPreprocessor:
         return [
             {"text": ent.text, "label": ent.label_}
             for ent in doc.ents
-            if len(ent.text.strip()) > 1  # Filter out single characters
-        ]
-    
-    def get_noun_chunks(self, doc: spacy.tokens.Doc) -> List[str]:
-        """Extract meaningful noun phrases"""
-        return [
-            chunk.text.lower() for chunk in doc.noun_chunks
-            if len(chunk.text.strip()) > 1  # Filter out single characters
+            if len(ent.text.strip()) > 1
         ]
     
     def get_keyword_frequencies(self, doc: spacy.tokens.Doc) -> Dict[str, int]:
-        """Get frequency distribution of keywords (lemmatized tokens + named entities)"""
+        """Get frequency distribution of keywords"""
         # Get lemmatized tokens
         tokens = self.get_lemmatized_tokens(doc)
         
         # Add named entities
         entities = [ent["text"].lower() for ent in self.get_named_entities(doc)]
         
-        # Add noun chunks
-        chunks = self.get_noun_chunks(doc)
-        
         # Combine all keywords
-        all_keywords = tokens + entities + chunks
+        all_keywords = tokens + entities
         
         # Count frequencies
         return dict(Counter(all_keywords))
@@ -123,12 +118,30 @@ class TextPreprocessor:
         cleaned_texts = [self.clean_text(text) for text in all_text if text and text.strip()]
         full_text = ' '.join(cleaned_texts)
         
+        logger.debug(f"Full text length IS: {len(full_text)}")
         # Process with spaCy
         doc = self.process_text(full_text)
+        logger.debug(f"SpaCy doc length: {len(doc)}")
+        
+        # Get lemmatized tokens
+        lemmatized = self.get_lemmatized_tokens(doc)
+        logger.debug(f"Number of lemmatized tokens: {len(lemmatized)}")
+        logger.debug(f"Sample lemmatized tokens: {lemmatized[:10]}")
+        
+        # Deduplicate and sort
+        unique_tokens = sorted(set(lemmatized))
+        logger.debug(f"Number of unique tokens: {len(unique_tokens)}")
+        logger.debug(f"Sample unique tokens: {unique_tokens[:10]}")
+        
+        # Join tokens for certain features
+        joined_tokens = ' '.join(unique_tokens)
+        logger.debug(f"Final joined tokens length: {len(joined_tokens)}")
+        logger.debug(f"Final joined tokens preview: {joined_tokens[:200]}...")
         
         return {
-            'lemmatized_tokens': self.get_lemmatized_tokens(doc),
+            'lemmatized_tokens': joined_tokens,  # For backward compatibility
+            'token_list': unique_tokens,  # For topic modeling
             'named_entities': self.get_named_entities(doc),
-            'noun_chunks': self.get_noun_chunks(doc),
-            'keyword_frequencies': self.get_keyword_frequencies(doc)
+            'keyword_frequencies': self.get_keyword_frequencies(doc),
+            'spacy_doc': doc  # Return the spaCy doc for reuse
         } 

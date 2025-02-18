@@ -239,13 +239,13 @@ class ContentParser:
         """Get clean text content without scripts, styles, etc."""
         if not self.soup:
             return ""
-            
         # Get text excluding scripts and styles
         text = self.soup.get_text(separator=' ', strip=True)
         
-        # Clean up whitespace
-        text = re.sub(r'\s+', ' ', text)
-        
+        # Clean up excessive whitespace while preserving sentence boundaries
+        text = re.sub(r'\s*\n\s*', '\n', text)  # Clean up newlines
+        text = re.sub(r'[ \t]+', ' ', text)      # Clean up spaces/tabs
+        text = re.sub(r'\n+', '\n', text)        # Clean up multiple newlines
         return text.strip()
     
     def _detect_language(self) -> str:
