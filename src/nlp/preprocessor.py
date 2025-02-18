@@ -5,7 +5,6 @@ from collections import Counter
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 class TextPreprocessor:
     def __init__(self):
@@ -117,26 +116,17 @@ class TextPreprocessor:
         # Clean and combine all text with proper spacing
         cleaned_texts = [self.clean_text(text) for text in all_text if text and text.strip()]
         full_text = ' '.join(cleaned_texts)
-        
-        logger.debug(f"Full text length IS: {len(full_text)}")
         # Process with spaCy
         doc = self.process_text(full_text)
-        logger.debug(f"SpaCy doc length: {len(doc)}")
         
         # Get lemmatized tokens
         lemmatized = self.get_lemmatized_tokens(doc)
-        logger.debug(f"Number of lemmatized tokens: {len(lemmatized)}")
-        logger.debug(f"Sample lemmatized tokens: {lemmatized[:10]}")
         
         # Deduplicate and sort
         unique_tokens = sorted(set(lemmatized))
-        logger.debug(f"Number of unique tokens: {len(unique_tokens)}")
-        logger.debug(f"Sample unique tokens: {unique_tokens[:10]}")
         
         # Join tokens for certain features
         joined_tokens = ' '.join(unique_tokens)
-        logger.debug(f"Final joined tokens length: {len(joined_tokens)}")
-        logger.debug(f"Final joined tokens preview: {joined_tokens[:200]}...")
         
         return {
             'lemmatized_tokens': joined_tokens,  # For backward compatibility

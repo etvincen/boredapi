@@ -43,9 +43,15 @@ class SearchService:
                     "bool": {
                         "must": [
                             {
-                                "combined_fields": {
+                                "multi_match": {
                                     "query": query,
-                                    "fields": ["title^2", "raw_text"]
+                                    "fields": [
+                                        "title^2",
+                                        "raw_text",
+                                        "preprocessed_keywords^1.5"
+                                    ],
+                                    "type": "best_fields",
+                                    "analyzer": "french_exact"
                                 }
                             }
                         ],

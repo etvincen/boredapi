@@ -13,7 +13,8 @@ def get_elasticsearch_mappings() -> Dict[str, Any]:
                         "type": "custom",
                         "tokenizer": "standard",
                         "filter": [
-                            "lowercase"
+                            "lowercase",
+                            "asciifolding"  # Remove diacritics/accents
                         ]
                     }
                 }

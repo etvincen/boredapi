@@ -92,16 +92,21 @@ class NLPProcessor:
                 'probability': round(topic['probability'], 3)
             })
         
+        # Get keywords and add non-accented versions
+        keywords = nlp_features.get('lemmatized_tokens', '').split()
+        normalized_keywords = [word.translate(str.maketrans('áàâäéèêëíìîïóòôöúùûüýÿ', 'aaaaeeeeiiiioooouuuuyy')) for word in keywords]
+        combined_keywords = ' '.join(keywords + normalized_keywords)
+        
         # Prepare the document with all fields
         return {
             'url': doc.get('url', ''),
             'title': doc.get('title', ''),
             'raw_text': doc_stats['raw_text'],
-            'preprocessed_keywords': nlp_features.get('lemmatized_tokens', []),
+            'preprocessed_keywords': combined_keywords,
             'topics': topics,
             'statistics': doc_stats['statistics'],
             'text_embedding': nlp_features.get('embedding'),
-            'keywords': nlp_features.get('keywords', []),
+            'keywords': nlp_features.get('keywords'),
             'named_entities': nlp_features.get('named_entities', {'groups': {}, 'counts': {}})
         }
         
