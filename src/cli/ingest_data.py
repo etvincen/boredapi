@@ -101,8 +101,8 @@ def main():
         
         crawl_data = load_crawl_results(latest_crawl)
         
-        # Take only 40 documents
-        crawl_data['results'] = crawl_data['results'][:40]
+        # Take all documents
+        crawl_data['results'] = crawl_data['results']
 
         # Take all documents
         # crawl_data['results'] = crawl_data['results']
