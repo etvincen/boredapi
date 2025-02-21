@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from elasticsearch import Elasticsearch
 from src.config import settings
+from src.api.services.search import SearchService, SearchMode
 
 router = APIRouter()
 
@@ -21,87 +22,50 @@ def get_es_client() -> Elasticsearch:
 @router.get("/content/search")
 async def search_content(
     q: str = Query(..., description="Search query"),
+    mode: SearchMode = Query("hybrid", description="Search mode: hybrid, semantic, or keyword"),
     size: int = Query(10, ge=1, le=100, description="Number of results per page"),
     page: int = Query(1, ge=1, description="Page number"),
     min_length: Optional[int] = Query(None, ge=0, description="Minimum content length"),
-    content_type: Optional[str] = Query(None, description="Filter by content type")
+    content_type: Optional[str] = Query(None, description="Filter by content type"),
+    include_stats: bool = Query(False, description="Include content statistics in results")
 ) -> Dict[str, Any]:
     """
-    Search content with various filters
+    Search content with various filters and configurable search mode
     """
     try:
         es = get_es_client()
+        search_service = SearchService(es, "roc_eclerc_content")
         
-        # Build query
-        must_conditions = [
-            {"multi_match": {
-                "query": q,
-                "fields": ["title^2", "content", "meta_tags.description"]
-            }}
-        ]
+        # Calculate offset for pagination
+        from_idx = (page - 1) * size
         
-        if min_length:
-            must_conditions.append({
-                "range": {
-                    "content_stats.text_length": {
-                        "gte": min_length
-                    }
-                }
-            })
-            
-        if content_type:
-            must_conditions.append({
-                "term": {
-                    "metadata.content_type": content_type
-                }
-            })
-        
-        # Execute search
-        result = es.search(
-            index="roc_eclerc_content",
-            body={
-                "query": {"bool": {"must": must_conditions}},
-                "from": (page - 1) * size,
-                "size": size,
-                "highlight": {
-                    "fields": {
-                        "content": {},
-                        "title": {}
-                    }
-                },
-                "aggs": {
-                    "content_types": {
-                        "terms": {
-                            "field": "metadata.content_type"
-                        }
-                    },
-                    "avg_content_length": {
-                        "avg": {
-                            "field": "content_stats.text_length"
-                        }
-                    }
-                }
-            }
+        # Perform search with selected mode
+        results = search_service.search(
+            query=q,
+            mode=mode,
+            size=size,
+            include_stats=include_stats
         )
         
+        # Apply additional filters if needed
+        if min_length or content_type:
+            results = [
+                r for r in results
+                if (not min_length or len(r.get('text_preview', '')) >= min_length)
+                and (not content_type or r.get('content_type') == content_type)
+            ]
+        
+        # Paginate results
+        paginated_results = results[from_idx:from_idx + size]
+        
         return {
-            "total": result["hits"]["total"]["value"],
+            "total": len(results),
             "page": page,
             "size": size,
-            "results": [
-                {
-                    "id": hit["_id"],
-                    "title": hit["_source"]["title"],
-                    "url": hit["_source"]["url"],
-                    "highlights": hit.get("highlight", {}),
-                    "content_stats": hit["_source"].get("content_stats", {}),
-                    "metadata": hit["_source"].get("metadata", {})
-                }
-                for hit in result["hits"]["hits"]
-            ],
-            "aggregations": {
-                "content_types": result["aggregations"]["content_types"]["buckets"],
-                "avg_content_length": result["aggregations"]["avg_content_length"]["value"]
+            "search_mode": mode,
+            "results": paginated_results,
+            "performance": {
+                "took_ms": paginated_results[0]['took_ms'] if paginated_results else 0
             }
         }
         

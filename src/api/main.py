@@ -8,6 +8,7 @@ import logging
 from pydantic import BaseModel
 from src.config import settings
 from src.api.services.search import SearchService
+from src.api.routes import content  # Import the content routes
 import os
 
 # Configure logging
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include content routes
+app.include_router(content.router, prefix="/api/v1")
 
 # Mount static files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
