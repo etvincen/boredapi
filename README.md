@@ -60,10 +60,17 @@ cd boredapi
 cp .env.example .env
 # Edit .env with your settings
 ```
+### 2. Docker Setup
+Follow Docker Installation instructions
+- https://docs.docker.com/engine/install/ubuntu/
 
-### 2. Poetry Setup
+
+### 3. Poetry Setup
 
 ```bash
+# Dowload Poetry
+curl -sSL https://install.python-poetry.org | python3 -
+
 # Configure Poetry
 poetry config virtualenvs.path
 poetry config virtualenvs.in-project true
@@ -78,7 +85,7 @@ source .venv/bin/activate
 poetry run playwright install chromium
 ```
 
-### 3. Running the Pipeline
+### 4. Running the Pipeline
 
 ```bash
 # 1. Start Elasticsearch and Kibana
@@ -94,13 +101,13 @@ poetry run python -m src.cli.ingest_data
 poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 4. Verify Installation
+### 5. Verify Installation
 
 - Check Elasticsearch: http://localhost:9200
 - Check Kibana: http://localhost:5601
 - Check API docs: http://localhost:8000/docs
 
-### 5. Search API
+### 6. Search API
 The API runs at http://localhost:8000 with these endpoints:
 
 #### Search
