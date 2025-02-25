@@ -13,11 +13,6 @@ wait_for_service() {
     echo "$service is ready!"
 }
 
-# Wait for required services
-if [ "$WAIT_FOR_DB" = "true" ]; then
-    wait_for_service $POSTGRES_SERVER 5432 "PostgreSQL"
-fi
-
 if [ "$WAIT_FOR_ES" = "true" ]; then
     wait_for_service $ELASTICSEARCH_HOST 9200 "Elasticsearch"
 fi

@@ -1,0 +1,44 @@
+cluster.name: "docker-cluster"
+network.host: 0.0.0.0
+
+# Increase thread pools for better concurrency
+thread_pool:
+  write:
+    size: 3
+    queue_size: 1000
+  search:
+    size: 3
+    queue_size: 10000
+  get:
+    size: 3
+    queue_size: 1000
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Network settings
+http.max_content_length: 100mb
+http.max_initial_line_length: 8kb
+http.max_header_size: 16kb
+
+# Cache settings
+indices.queries.cache.size: 10%
+indices.requests.cache.size: 5%
+
+# Indexing performance
+indices.memory.index_buffer_size: 30%
+
+# Security settings
+xpack.security.enabled: true
+xpack.security.authc.api_key.enabled: true
+xpack.security.transport.ssl.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.authc.token.enabled: true
+
+# Discovery settings
+discovery.type: single-node
+
+# Circuit breaker settings
+indices.breaker.total.limit: 70%
+indices.breaker.request.limit: 60%
+indices.breaker.fielddata.limit: 40% 

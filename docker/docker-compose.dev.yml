@@ -5,11 +5,14 @@ services:
     user: root
     volumes:
       - es_tokens:/tokens
+      - es_data:/usr/share/elasticsearch/data
     command: >
       bash -c "
         mkdir -p /tokens &&
         chown -R 1000:0 /tokens &&
-        chmod 775 /tokens
+        chmod 775 /tokens &&
+        chown -R 1000:0 /usr/share/elasticsearch/data &&
+        chmod 700 /usr/share/elasticsearch/data
       "
     profiles: ["setup"]
 
@@ -24,9 +27,17 @@ services:
       - xpack.security.http.ssl.enabled=false
       - xpack.security.authc.token.enabled=true
       - ELASTIC_PASSWORD=elastic123
-      - "ES_JAVA_OPTS=-Xms400m -Xmx400m"
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g -XX:+UseG1GC -XX:G1ReservePercent=25 -XX:InitiatingHeapOccupancyPercent=30"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     volumes:
-      - ${DEV_DATA_PATH:-../data}/elasticsearch:/usr/share/elasticsearch/data
+      - es_data:/usr/share/elasticsearch/data
+      - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
       - ./setup-users.sh:/setup-users.sh:ro
       - es_tokens:/tokens
     ports:
@@ -41,9 +52,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 600M
+          memory: 3G
+          cpus: '2'
         reservations:
-          memory: 400M
+          memory: 2G
+          cpus: '1'
     command: >
       bash -c "
         # Start Elasticsearch
@@ -69,9 +82,10 @@ services:
       elasticsearch:
         condition: service_healthy
     environment:
-      - NODE_OPTIONS="--max-old-space-size=384"
+      - NODE_OPTIONS="--max-old-space-size=1024"
       - LOGGING_ROOT_LEVEL=info
       - LOGGING_VERBOSE=true
+      - SERVER_MAXPAYLOADBYTES=10485760
     volumes:
       - ./kibana.yml:/usr/share/kibana/config/kibana.yml:ro
       - ./kibana/dashboards:/dashboards:ro
@@ -83,9 +97,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1.5G
+          cpus: '1'
         reservations:
-          memory: 384M
+          memory: 1G
+          cpus: '0.5'
     healthcheck:
       test: ["CMD-SHELL", "curl -s -I http://localhost:5601/api/status | grep -q 'HTTP/1.1 200 OK'"]
       interval: 30s
@@ -109,3 +125,4 @@ networks:
 
 volumes:
   es_tokens:
+  es_data:

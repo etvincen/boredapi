@@ -84,19 +84,31 @@ case "$1" in
         docker compose -f "$PROJECT_ROOT/docker/docker-compose.dev.yml" logs -f
         ;;
         
+    stats)
+        echo "Monitoring container resource usage (press Ctrl+C to exit)..."
+        docker stats $(docker compose -f "$PROJECT_ROOT/docker/docker-compose.dev.yml" ps -q)
+        ;;
+        
+    restart)
+        echo "Restarting services..."
+        docker compose -f "$PROJECT_ROOT/docker/docker-compose.dev.yml" restart
+        ;;
+        
     help)
-        echo "Usage: $0 {start|stop|clean|status|logs|help}"
+        echo "Usage: $0 {start|stop|restart|status|logs|stats|help}"
         echo
         echo "Commands:"
-        echo "1. start  - Start all services"
-        echo "2. stop   - Stop all services"
-        echo "3. clean  - Clean data directories"
-        echo "4. status - Show service status"
-        echo "5. logs   - Show service logs"
-        echo "6. help   - Show this help message"
+        echo "1. start   - Start all services"
+        echo "2. stop    - Stop all services"
+        echo "3. restart - Restart all services"
+        echo "4. status  - Show service status"
+        echo "5. logs    - Show service logs"
+        echo "6. stats   - Monitor container resource usage"
+        echo "7. help    - Show this help message"
         echo
         echo "Services:"
         echo "- Elasticsearch: http://localhost:9200"
+        echo "- Kibana: http://localhost:5601"
         ;;
         
     *)
