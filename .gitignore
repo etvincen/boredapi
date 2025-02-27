@@ -39,7 +39,7 @@ ENV/
 *.ipynb
 
 # Analysis results
-analysis_results/
+analysis_results/*
 !docker/kibana/dashboards/*
 
 # Project specific
