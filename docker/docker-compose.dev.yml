@@ -61,7 +61,7 @@ services:
       bash -c "
         # Start Elasticsearch
         /usr/local/bin/docker-entrypoint.sh elasticsearch &
-        ES_PID=$!
+        ES_PID=$$!
 
         # Wait for Elasticsearch to be fully ready
         until curl -s -u elastic:elastic123 http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'; do
@@ -73,7 +73,7 @@ services:
         bash /setup-users.sh
 
         # Keep elasticsearch running
-        wait $ES_PID
+        wait $$ES_PID
       "
 
   kibana:
